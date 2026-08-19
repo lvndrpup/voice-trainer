@@ -66,10 +66,16 @@ docs/documentation-standards.md. Summary:
   PreToolUse hook (.claude/hooks/check-test-plan.sh) while the PR's
   Test plan section still has unchecked boxes. Only constrains Claude
   Code sessions — merging manually on GitHub is unaffected.
-- `/wizard-review [PR#]` runs four reviewer personas — correctness,
+- `/wizard-review [PR#]` runs reviewer personas — correctness,
   security, simplicity, performance (.claude/agents/wizard-*.md) —
-  independently, then a cross-wizard reaction round, and posts both as
-  comments on the PR. Not automatic; run it when you want it. When executing the /wizard-review command, clarify which wizard reviewers to include and which **[effort_level]** they should be using. 
+  independently, then a cross-wizard reaction round, then a Scrum
+  Master (.claude/agents/wizard-scrummaster.md) synthesis comment that
+  always runs last regardless of which reviewers ran, and posts these
+  as comments on the PR. Not automatic; run it when you want it. When
+  executing the /wizard-review command, clarify which wizard reviewers
+  to include, which **[effort_level]** they should be using, and
+  whether to post the full discussion or just the Scrum Master's
+  summary.
 
 
 ## Design docs (read when relevant, not by default)
