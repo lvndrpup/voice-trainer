@@ -12,7 +12,7 @@ import {
 } from "./audio";
 import { computeLogFrequencyBins, detectPitch } from "./dsp";
 import { SpectrogramRenderer } from "./render";
-import { SessionStore } from "./store";
+import { SessionStore, sessionsToExportJson } from "./store";
 
 // T is set by the caller's explicit type argument (mirrors DOM's own
 // querySelector<T>), not inferred from the selector string.
@@ -30,6 +30,8 @@ const peakEl = requireElement<HTMLSpanElement>("#peak-db");
 const f0El = requireElement<HTMLSpanElement>("#f0-hz");
 const statusEl = requireElement<HTMLParagraphElement>("#mic-status");
 const canvas = requireElement<HTMLCanvasElement>("#spectrogram");
+const deleteAllButton = requireElement<HTMLButtonElement>("#delete-all");
+const exportButton = requireElement<HTMLButtonElement>("#export-json");
 
 const capture = new MicrophoneCapture();
 const spectrogram = new SpectrogramRenderer(canvas);
@@ -123,6 +125,8 @@ async function handleStart(): Promise<void> {
 
     statusEl.textContent = statusText;
     button.textContent = "Stop capture";
+    deleteAllButton.disabled = true;
+    exportButton.disabled = true;
     lastFrameLoggedAt = 0;
     tick();
   } catch (err) {
@@ -153,9 +157,60 @@ async function handleStop(): Promise<void> {
   f0El.textContent = "—";
   statusEl.textContent = "Stopped";
   button.textContent = "Start capture";
+  deleteAllButton.disabled = false;
+  exportButton.disabled = false;
   spectrogram.clear();
+}
+
+async function handleDeleteAll(): Promise<void> {
+  const confirmed = window.confirm("Delete all saved sessions? This cannot be undone.");
+  if (!confirmed) {
+    return;
+  }
+  deleteAllButton.disabled = true;
+  try {
+    await sessionStore.deleteAll();
+    statusEl.textContent = "All sessions deleted.";
+  } catch (err) {
+    statusEl.textContent = "Failed to delete sessions — see console.";
+    throw err;
+  } finally {
+    deleteAllButton.disabled = false;
+  }
+}
+
+function downloadJson(filename: string, json: string): void {
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function handleExport(): Promise<void> {
+  exportButton.disabled = true;
+  try {
+    const sessions = await sessionStore.getAllSessionsWithFrames();
+    const json = sessionsToExportJson(sessions);
+    downloadJson(`resonance-scope-sessions-${Date.now()}.json`, json);
+  } catch (err) {
+    statusEl.textContent = "Failed to export sessions — see console.";
+    throw err;
+  } finally {
+    exportButton.disabled = false;
+  }
 }
 
 button.addEventListener("click", () => {
   void (capture.state === "active" ? handleStop() : handleStart());
+});
+
+deleteAllButton.addEventListener("click", () => {
+  void handleDeleteAll();
+});
+
+exportButton.addEventListener("click", () => {
+  void handleExport();
 });

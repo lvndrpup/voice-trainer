@@ -69,7 +69,11 @@ for now," not "settled forever."
   Feature-frame logging is throttled to ~10Hz by the caller, not the
   ~60Hz animation-frame rate the instrument display runs at. See
   [ADR 0003](./adr/0003-session-persistence-schema.md) and
-  [session-store.md](./session-store.md).
+  [session-store.md](./session-store.md). Persistence failures degrade
+  gracefully — a broken IndexedDB doesn't block the instrument, it
+  just stops saving and says so. v0.2 is now complete per
+  [roadmap.md](./roadmap.md)'s criterion (sessions persist and export
+  as JSON).
 - getUserMedia must disable echoCancellation, noiseSuppression, and
   autoGainControl. AGC alone invalidates every intensity and spectral-
   tilt measure.
