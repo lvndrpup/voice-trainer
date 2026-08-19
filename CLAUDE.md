@@ -52,6 +52,14 @@ docs/documentation-standards.md. Summary:
   pass/fail checkbox. If something can't be verified in this
   environment (no browser, no real mic), say so explicitly and leave
   it unchecked rather than skipping it.
+- .claude/settings.json blocks `gh pr merge`/`gh pr close` via a
+  PreToolUse hook (.claude/hooks/check-test-plan.sh) while the PR's
+  Test plan section still has unchecked boxes. Only constrains Claude
+  Code sessions — merging manually on GitHub is unaffected.
+- `/wizard-review [PR#]` runs four reviewer personas — correctness,
+  security, simplicity, performance (.claude/agents/wizard-*.md) —
+  independently, then a cross-wizard reaction round, and posts both as
+  comments on the PR. Not automatic; run it when you want it.
 
 ## Design docs (read when relevant, not by default)
 - docs/roadmap.md      — versions and scope
