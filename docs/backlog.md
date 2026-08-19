@@ -34,9 +34,10 @@ straight to a drafted agent file, no milestone needed.
   criteria and CLAUDE.md's non-negotiables. Already drafted at
   `.claude/agents/reviewer.md`, not yet committed.
 - **ledger-scribe** — appends the correct `docs/ledger.md` row after a
-  PR merges, per that file's own "How to add a row" process (currently
+  PR merges, per that file's own "How to add a row" process (previously
   a manual step). Project-specific, not pulled from an external
-  pattern.
+  pattern. Already drafted at `.claude/agents/ledger-scribe.md`, not
+  yet committed.
 - **debugger** — reproduces and root-causes a *live* failure (a flaky
   Playwright run, a spectrogram artifact), distinct from `reviewer`'s
   diff-vs-criteria job.
