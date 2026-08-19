@@ -166,6 +166,16 @@ for now," not "settled forever."
 
 ## Open
 
+- `FeatureFrame.peakDb` can legitimately be `-Infinity` (a silent
+  frame — `peakDb()` in `main.ts` starts there and only rises if a
+  spectrum bin has energy), but `sessionsToExportJson()` uses
+  `JSON.stringify`, which serializes `-Infinity` as `null` — silently
+  violating the field's `number` (non-nullable) type in the exported
+  file. Found by `e2e/session-lifecycle.spec.ts` against a real
+  `AnalyserNode`, not fixed here — fixing it means deciding whether
+  `peakDb` becomes `number | null` (a schema version bump, mirroring
+  how `f0Hz` already handles "no signal") or `main.ts` clamps before
+  storing, and that's a product call, not a testing-PR call.
 - Whether H1-H2 survives mic-response confounds well enough to justify
   the formant-correction work.
 - Where exercise content comes from — needs a real SLP source.

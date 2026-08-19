@@ -35,6 +35,12 @@ test("start logs a session with frames; stop closes it out", async ({ page }) =>
     expect(frame.sessionId).toBe(session.id);
     expect(frame.schemaVersion).toBe(1);
     expect(frame.f0Hz === null || Number.isFinite(frame.f0Hz)).toBe(true);
-    expect(Number.isFinite(frame.peakDb)).toBe(true);
+    // peakDb() in main.ts starts at -Infinity and only rises if a
+    // spectrum bin has energy, so a silent frame legitimately stores
+    // -Infinity — this is real observed behavior against a real
+    // AnalyserNode, not a fixture gap. See docs/decisions.md for the
+    // export-fidelity issue this surfaces (JSON.stringify turns it
+    // into `null`, silently violating the `number` field type).
+    expect(frame.peakDb === -Infinity || Number.isFinite(frame.peakDb)).toBe(true);
   }
 });
