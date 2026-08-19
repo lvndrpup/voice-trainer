@@ -1,6 +1,9 @@
 # Decisions
 
-A running ledger, grouped under Decided / Corrected / Open / Deferred.
+A running log, grouped under Decided / Corrected / Open / Deferred.
+(Not to be confused with [ledger.md](./ledger.md), which records what
+actually shipped rather than what's currently believed — see that
+file, and CLAUDE.md's "Docs vs. specs" rule, for the distinction.)
 
 Every entry here is untested belief until real signal arrives. This
 document existed before any code did, and the first hour of looking at
