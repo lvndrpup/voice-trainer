@@ -14,9 +14,20 @@ import {
   AudioContextSuspendedError,
 } from "./audio";
 
-const button = document.querySelector<HTMLButtonElement>("#mic-toggle")!;
-const peakEl = document.querySelector<HTMLSpanElement>("#peak-db")!;
-const statusEl = document.querySelector<HTMLParagraphElement>("#mic-status")!;
+// T is set by the caller's explicit type argument (mirrors DOM's own
+// querySelector<T>), not inferred from the selector string.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+function requireElement<T extends Element>(selector: string): T {
+  const el = document.querySelector<T>(selector);
+  if (!el) {
+    throw new Error(`Expected element matching "${selector}" in index.html.`);
+  }
+  return el;
+}
+
+const button = requireElement<HTMLButtonElement>("#mic-toggle");
+const peakEl = requireElement<HTMLSpanElement>("#peak-db");
+const statusEl = requireElement<HTMLParagraphElement>("#mic-status");
 
 const capture = new MicrophoneCapture();
 let rafHandle: number | null = null;
