@@ -130,6 +130,15 @@ for now," not "settled forever."
 - Private repo until v0.1, then public.
 - Conventional Commits, branch per issue, squash merge, even solo.
 - Personal hardware only. Never work hardware.
+- GitHub Project board ("Resonance Scope", project 1) tracks work:
+  Backlog → Ready → In Progress → In Review → Done, with a WIP limit
+  of 1 in In Progress and a 5-item cap on Ready, so the board can't
+  silently fill up with half-groomed intentions. Milestones map to
+  roadmap.md versions. See CLAUDE.md's "Tracking" section for the
+  full field/rule list. This had already been in informal use for a
+  cycle before it was written down here — CLAUDE.md's rule is that
+  docs land in the same commit as the code they describe, and process
+  conventions are no exception, they'd just been missed once.
 
 ## Corrected
 

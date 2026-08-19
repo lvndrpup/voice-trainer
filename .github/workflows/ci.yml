@@ -28,6 +28,11 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # Pinned to the @playwright/test version in package.json — bump both
+    # together. Browser system deps ship preinstalled in this image, which
+    # skips the apt-get step that was hanging on runner mirror lookups.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +43,6 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
 
       - run: npm run test:e2e
