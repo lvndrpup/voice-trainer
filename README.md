@@ -32,7 +32,7 @@ Opens at `http://localhost:5173`. Click **Start capture**, allow microphone acce
 | `npm run build` | Typecheck, then production build |
 | `npm run preview` | Serve the production build locally |
 
-Browser-only code (Web Audio, IndexedDB) can't run under Node, so it's covered separately by browser-driven end-to-end tests rather than `npm run test` — see [docs/index.md](docs/index.md) for the full documentation set, including how those are run.
+Browser-only code (Web Audio, IndexedDB) can't run under Node, so `npm run test` doesn't cover it — today that's exercised manually in-browser rather than by an automated suite. See [docs/index.md](docs/index.md) for the full documentation set.
 
 ## Architecture
 
