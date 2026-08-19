@@ -54,6 +54,24 @@ animation frame would multiply storage for no benefit. This is an
 implementation parameter the caller controls, not something enforced
 inside the store itself.
 
+## Session lifecycle in `main.ts`
+
+`main.ts` starts a session (`sessionStore.startSession(info.deviceId)`)
+right after a successful `capture.start()`, logs a throttled frame from
+inside the existing `tick()` render loop, and ends the session
+(`sessionStore.endSession(id)`) at the top of `handleStop()`.
+
+Persistence failures **degrade gracefully rather than blocking the
+instrument** — a broken IndexedDB shouldn't stop you from seeing your
+own spectrogram or from being able to stop your microphone. Both
+`startSession` and `endSession` failures are caught, logged to the
+console (not swallowed silently), and — for `startSession` — surfaced
+in the status text ("— not saving (storage unavailable)") so the user
+knows their session isn't being recorded. This is a deliberate product
+choice, not laziness: an instrument that stops working because of a
+storage error would be a worse failure mode than one that silently
+(but visibly-in-console) stops saving.
+
 ## Known gaps
 
 - **No automated tests for the IndexedDB-touching methods.** Node has
@@ -68,6 +86,11 @@ inside the store itself.
   swallowed — consistent with this project's error-handling stance —
   but there's no graceful degradation, e.g. warning the user before
   they hit the limit).
+- **Abrupt termination leaves `endedAt: null` forever.** Closing the
+  tab or losing power mid-session never calls `endSession()` — there's
+  no `visibilitychange`/`beforeunload` handler. The session record and
+  its frames are still there, just with no end timestamp. Not solved
+  here; flagged rather than silently left unhandled.
 - **No migration path yet.** `SESSION_SCHEMA_VERSION` exists and is
   stamped on every record, but nothing reads it to migrate old records
   forward — there's only ever been one schema version so far.
