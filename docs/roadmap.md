@@ -14,8 +14,10 @@ Versions are effort-sized, not date-sized. A version is done when its
 | v1.1+ | Acoustic strain proxies, n=1 classifier, PWA/offline, HTTPS for mobile testing. | — |
 | Someday | Terraform/Azure hosting, Ansible + Molecule runner, GitHub Actions PR review. | — |
 
-See [backlog](./backlog.md) for ideas that haven't been assigned to a
-version yet.
+This table is intent, not a live status board — a version can sit at
+"next" for months. See [docs/ledger.md](./ledger.md) for what's
+actually shipped, and [backlog](./backlog.md) for ideas that haven't
+been assigned to a version yet.
 
 ## Backlog refinement
 

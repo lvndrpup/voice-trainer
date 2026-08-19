@@ -169,6 +169,14 @@ for now," not "settled forever."
 
 ## Open
 
+- Spectrogram log-axis range: the shipped default
+  (`computeLogFrequencyBins` in `src/dsp/index.ts`) runs 20Hz to
+  Nyquist, with no `maxFrequencyHz` parameter at all. GitHub issue #2's
+  acceptance criteria mandate a 60Hz-8kHz axis instead — a real gap
+  between spec and shipped code, surfaced during that issue's grooming
+  and left unresolved there. Needs a product call: add a max-cap
+  parameter and change the defaults, or update the issue to match
+  shipped behavior. See [spectrogram.md](./spectrogram.md) and issue #2.
 - `FeatureFrame.peakDb` can legitimately be `-Infinity` (a silent
   frame — `peakDb()` in `main.ts` starts there and only rises if a
   spectrum bin has energy), but `sessionsToExportJson()` uses
