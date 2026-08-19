@@ -30,17 +30,31 @@ function completeAllSteps(engine: CalibrationEngine, overrides: Partial<Record<N
   }
 }
 
-void test("STEP_ORDER and STEP_PROMPTS: cover exactly steps 0, 1, 2, 4, 5", () => {
-  assert.deepEqual(STEP_ORDER, [0, 1, 2, 4, 5]);
+void test("STEP_PROMPTS: covers exactly steps 0, 1, 2, 4, 5, in that order", () => {
+  // STEP_ORDER is derived from STEP_PROMPTS, so this is the one place
+  // that needs to check the actual content — STEP_ORDER can't drift
+  // from it independently.
   assert.deepEqual(
     STEP_PROMPTS.map((p) => p.id),
     [0, 1, 2, 4, 5],
   );
+  assert.deepEqual(STEP_ORDER, STEP_PROMPTS.map((p) => p.id));
 });
 
 void test("CalibrationEngine: submitStep before beginStep throws", () => {
   const engine = new CalibrationEngine(null);
   assert.throws(() => engine.submitStep([]), CalibrationEngineError);
+});
+
+void test("CalibrationEngine: beginStep while another step is already in progress throws", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep(0);
+  assert.throws(() => {
+    engine.beginStep(1);
+  }, CalibrationEngineError);
+  // the original in-progress step is unaffected — still submittable
+  const check = engine.submitStep(readings([null, null], -70));
+  assert.equal(check?.id, "noise-floor");
 });
 
 void test("CalibrationEngine: beginStep rejects an unknown step id", () => {
@@ -115,6 +129,26 @@ void test("CalibrationEngine: noise-floor check fails when step 0's level is abo
   assert.ok(check);
   assert.equal(check.id, "noise-floor");
   assert.equal(check.passed, false);
+});
+
+void test("CalibrationEngine: noise-floor check reports a distinct message when there's no level reading at all, not 'noisy'", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep(0);
+  const check = engine.submitStep([]); // no readings collected at all
+  assert.ok(check);
+  assert.equal(check.id, "noise-floor");
+  assert.equal(check.passed, false);
+  assert.match(check.message, /couldn't get a level reading/i);
+  assert.doesNotMatch(check.message, /noisy/i);
+});
+
+void test("CalibrationEngine: getStepReadings returns raw readings for a submitted step, null otherwise", () => {
+  const engine = new CalibrationEngine(null);
+  assert.equal(engine.getStepReadings(0), null);
+  engine.beginStep(0);
+  const submitted = readings([null, null], -70);
+  engine.submitStep(submitted);
+  assert.deepEqual(engine.getStepReadings(0), submitted);
 });
 
 void test("CalibrationEngine: noise-floor check passes when step 0's level is below threshold", () => {

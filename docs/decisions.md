@@ -125,16 +125,34 @@ for now," not "settled forever."
   the one place that knows every object store name across the app,
   since IndexedDB requires all of one version's schema changes to
   happen inside a single `onupgradeneeded` callback — `DATABASE_VERSION`
-  bumped 1 → 2 to add the `calibrations` store, additively (existing
-  `sessions`/`frames` data untouched).
+  bumped 1 → 3 across this PR (2 added `calibrations`, 3 added
+  `calibrationFrames` — see next entry), each additively (existing
+  data untouched).
 - `Calibration` (`src/store/calibration.ts`) deviates from
-  calibration.md's documented interface in two small ways: `deviceId`
-  is `string | null` rather than `string`, matching what
-  `MicrophoneCaptureInfo.deviceId` (`src/audio`) can actually provide
-  rather than inventing a placeholder; and an `id: string` primary key
-  was added, since IndexedDB needs a `keyPath` and the documented
-  interface didn't specify one. See
+  calibration.md's documented interface in two small schema-shape
+  ways: `deviceId` is `string | null` rather than `string`, matching
+  what `MicrophoneCaptureInfo.deviceId` (`src/audio`) can actually
+  provide rather than inventing a placeholder; and an `id: string`
+  primary key was added, since IndexedDB needs a `keyPath` and the
+  documented interface didn't specify one. A third, functional gap —
+  calibration.md also asks to store raw feature frames, not just the
+  summary, "so old calibrations can be recomputed when the formant
+  code changes" — was initially missed entirely (not even listed as a
+  deviation) and caught by `/wizard-review`'s correctness pass on the
+  PR before merge, not by the author. Closed in the same PR: a second
+  object store, `calibrationFrames`, persists each step's raw
+  `StepReading`s alongside the summary. See
   [calibration-store.md](./calibration-store.md).
+- `/wizard-review` on that same PR also caught a second real issue:
+  the PR's own commit had added a `## Tracking` section to CLAUDE.md
+  (GitHub Project board workflow) — content unrelated to "calibration
+  data layer," which had ended up in the working tree uncommitted
+  before the PR branch was even created and rode along into the
+  commit untouched, since the edit that added the actual
+  calibration-related bullet only touched its own hunk. Pulled back
+  out and re-landed as its own `chore:` PR instead. Lesson: a
+  file-level diff review (not just "does my intended hunk look right")
+  would have caught this before the review round did.
 - Calibration's wizard UI (`index.html`/`main.ts` wiring) is
   deliberately not part of v0.3's first PR — see calibration.md's
   6 steps, of which only 0/1/2/4/5 have a producer so far (step 3

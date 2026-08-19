@@ -81,21 +81,3 @@ docs/documentation-standards.md. Summary:
   modes, what you'd test. If you skipped error handling for brevity,
   say so.
 - Tag uncertain claims [likely] / [speculative]. Say "I don't know."
-
-## Tracking
-Board: GitHub Project "Resonance Scope" (project 1, owner lvndrpup).
-Statuses: Backlog -> Ready -> In Progress -> In Review -> Done.
-Fields: Size (XS/S/M/L), Layer, Started, Finished.
-Milestones = versions from docs/roadmap.md.
-
-Rules:
-- WIP limit is 1 in In Progress. Never start a second item.
-- Ready is capped at 5 items. If Ready is full, build something —
-  don't groom more.
-- An issue is Ready only when it has acceptance criteria, a Size, a
-  Layer, and a milestone.
-- Every PR body includes "Closes #N".
-- Use `gh issue` and `gh project item-edit` to read and update the
-  board. Never invent issue numbers — list them first.
-- Set Started when moving to In Progress, Finished when moving to Done.
-  These two fields are what make cycle time computable.

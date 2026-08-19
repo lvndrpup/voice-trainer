@@ -35,7 +35,9 @@ interface Calibration {
 }
 ```
 
-Two deliberate deviations from calibration.md's documented interface:
+Two deliberate schema-shape deviations from calibration.md's
+documented interface (a separate, functional gap — raw frame storage
+— used to sit here too; it's closed now, see below):
 
 - **`deviceId: string | null`, not `string`.** `MicrophoneCaptureInfo.
   deviceId` (`src/audio`) is itself nullable — not every browser
@@ -53,19 +55,53 @@ needs LPC, deferred to a follow-up PR with its own golden-file
 fixtures). The field exists now so the schema doesn't need a version
 bump when step 3 lands; only its nullability goes away.
 
-One IndexedDB object store, `calibrations` (keyPath `id`), in the same
-`resonance-scope` database `SessionStore` uses — see
-[session-store.md](./session-store.md) for the shared `src/store/idb.ts`
-helpers both stores are built on.
+## Raw frame storage
+
+calibration.md also asks to "store the raw feature frames from
+calibration too, not just the summary, so old calibrations can be
+recomputed when the formant code changes." A second object store,
+`calibrationFrames` (autoIncrement key `frameId`, indexed by
+`calibrationId`), holds one `CalibrationStepFrame` per `StepReading`
+the engine collected — mirrors `SessionStore`'s `sessions`/`frames`
+split (ADR 0003) for the same reason: appending shouldn't be a
+read-modify-write of a growing array.
+
+```typescript
+interface CalibrationStepFrame {
+  schemaVersion: number;
+  calibrationId: string;
+  stepId: NonFormantStepId;
+  levelDb: number;
+  f0Hz: number | null;
+}
+```
+
+No per-reading timestamp — `CalibrationEngine`'s `StepReading` doesn't
+carry one (see `src/calibration/index.ts`) — so ordering within a step
+relies on the autoIncrement `frameId` key, which IndexedDB assigns in
+insertion order; `getCalibrationFrames()` returns them in that order
+via the `calibrationId` index.
+
+Same throttling caveat as `SessionStore.appendFrame`
+([session-store.md](./session-store.md)): this store doesn't throttle
+writes itself, the caller must — a calibration step's readings are
+already whatever rate `main.ts`'s capture loop logs them at (~10Hz per
+that doc), not a raw per-animation-frame burst.
+
+Two IndexedDB object stores, `calibrations` (keyPath `id`) and
+`calibrationFrames`, in the same `resonance-scope` database
+`SessionStore` uses — see [session-store.md](./session-store.md) for
+the shared `src/store/idb.ts` helpers all these stores are built on.
 
 ## API
 
 | Method | Returns | Notes |
 |---|---|---|
-| `saveCalibration(data)` | `Promise<Calibration>` | Takes everything except `schemaVersion`/`id`/`timestamp`, which the store stamps itself — same pattern as `SessionStore.startSession`. |
+| `saveCalibration(data, rawReadingsByStep)` | `Promise<Calibration>` | `data` is everything except `schemaVersion`/`id`/`timestamp`, which the store stamps itself (same pattern as `SessionStore.startSession`). `rawReadingsByStep` — typically built from `CalibrationEngine.getStepReadings()` per submitted step — is persisted to `calibrationFrames` in the same transaction as the summary record. |
 | `listCalibrations()` | `Promise<Calibration[]>` | Oldest-first. |
 | `getLatestCalibration()` | `Promise<Calibration \| null>` | Most recent by `timestamp`. No device filtering yet — re-calibration-on-device-change (calibration.md's triggers list) is a future PR's concern, not this store's. |
-| `deleteAll()` | `Promise<void>` | Clears the `calibrations` store only — leaves `sessions`/`frames` untouched. |
+| `getCalibrationFrames(calibrationId)` | `Promise<CalibrationStepFrame[]>` | Raw readings for one calibration, in submission order — what a future recompute-from-raw-data feature would read. |
+| `deleteAll()` | `Promise<void>` | Clears both `calibrations` and `calibrationFrames` — leaves `sessions`/`frames` untouched. |
 
 ## Known gaps
 
@@ -76,3 +112,7 @@ helpers both stores are built on.
 - No storage-quota handling, same caveat as session-store.md.
 - No migration path — `CALIBRATION_SCHEMA_VERSION` exists and is
   stamped, but nothing reads it yet.
+- Nothing yet actually *recomputes* a calibration from
+  `calibrationFrames` — this PR only closes the storage half of
+  calibration.md's ask (the data exists to do it later), not the
+  recompute feature itself.

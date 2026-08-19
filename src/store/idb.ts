@@ -9,12 +9,14 @@
 // constants below rather than each running their own open()/upgrade.
 
 export const DATABASE_NAME = "resonance-scope";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 export const SESSIONS_STORE = "sessions";
 export const FRAMES_STORE = "frames";
 export const FRAMES_SESSION_ID_INDEX = "sessionId";
 export const CALIBRATIONS_STORE = "calibrations";
+export const CALIBRATION_FRAMES_STORE = "calibrationFrames";
+export const CALIBRATION_FRAMES_CALIBRATION_ID_INDEX = "calibrationId";
 
 export class StoreError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -77,6 +79,16 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(CALIBRATIONS_STORE)) {
         db.createObjectStore(CALIBRATIONS_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(CALIBRATION_FRAMES_STORE)) {
+        const calibrationFrames = db.createObjectStore(CALIBRATION_FRAMES_STORE, {
+          keyPath: "frameId",
+          autoIncrement: true,
+        });
+        calibrationFrames.createIndex(
+          CALIBRATION_FRAMES_CALIBRATION_ID_INDEX,
+          "calibrationId",
+        );
       }
     };
     request.onsuccess = () => {

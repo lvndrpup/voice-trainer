@@ -20,8 +20,6 @@ import { medianOfFinite, estimateHabitualF0Hz, estimateComfortableF0Range } from
 
 export type NonFormantStepId = 0 | 1 | 2 | 4 | 5;
 
-export const STEP_ORDER: readonly NonFormantStepId[] = [0, 1, 2, 4, 5];
-
 export interface StepPrompt {
   id: NonFormantStepId;
   /** Shown to the user verbatim — calibration.md's "don't say
@@ -30,6 +28,9 @@ export interface StepPrompt {
   durationMs: number;
 }
 
+/** The canonical step list — order and membership. STEP_ORDER is
+ * derived from this rather than hand-duplicated, so the two can't
+ * drift out of sync with each other. */
 export const STEP_PROMPTS: readonly StepPrompt[] = [
   { id: 0, prompt: "Stay quiet a moment while I listen to your room", durationMs: 3000 },
   { id: 1, prompt: "Say ahh, like at the doctor", durationMs: 5000 },
@@ -37,6 +38,8 @@ export const STEP_PROMPTS: readonly StepPrompt[] = [
   { id: 4, prompt: "Say hiii like you're greeting a dog", durationMs: 2000 },
   { id: 5, prompt: "Hum a slide up, then down — stop wherever it stops feeling easy", durationMs: 8000 },
 ];
+
+export const STEP_ORDER: readonly NonFormantStepId[] = STEP_PROMPTS.map((p) => p.id);
 
 /** One tick's worth of already-computed features — the same shape
  * main.ts's tick() loop already produces for session logging (peak dB,
@@ -115,9 +118,12 @@ function computeStepValidity(
         id: "noise-floor",
         stepId,
         passed,
-        message: passed
-          ? "Room is quiet enough."
-          : "It's noisy in here — find a quieter spot and redo this step.",
+        message:
+          noiseFloorDb === null
+            ? "Couldn't get a level reading — check your mic and redo this step."
+            : passed
+              ? "Room is quiet enough."
+              : "It's noisy in here — find a quieter spot and redo this step.",
       };
     }
     case 1: {
@@ -174,6 +180,11 @@ export class CalibrationEngine {
     if (!STEP_ORDER.includes(stepId)) {
       throw new CalibrationEngineError(`Unknown calibration step ${String(stepId)}.`);
     }
+    if (this.#currentStep !== null) {
+      throw new CalibrationEngineError(
+        `beginStep(${String(stepId)}) called while step ${String(this.#currentStep)} is still in progress — call submitStep() first.`,
+      );
+    }
     this.#currentStep = stepId;
   }
 
@@ -198,6 +209,15 @@ export class CalibrationEngine {
 
   isComplete(): boolean {
     return STEP_ORDER.every((id) => this.#readingsByStep.has(id));
+  }
+
+  /** Raw readings for a submitted step, for callers that want to
+   * persist them alongside the summary draft — calibration.md asks to
+   * "store the raw feature frames too... so old calibrations can be
+   * recomputed when the formant code changes." Null if `stepId` hasn't
+   * been submitted yet. */
+  getStepReadings(stepId: NonFormantStepId): readonly StepReading[] | null {
+    return this.#readingsByStep.get(stepId) ?? null;
   }
 
   /** Throws if isComplete() would return false — callers should check

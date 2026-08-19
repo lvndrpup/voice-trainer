@@ -16,9 +16,27 @@
 // golden-file fixtures, per decisions.md's "Corrected" ledger entry on
 // custom DSP needing an oracle. Nothing in src/ constructs a full
 // Calibration until that lands; this module only stores/retrieves one.
+//
+// calibration.md also asks to "store the raw feature frames from
+// calibration too, not just the summary, so old calibrations can be
+// recomputed when the formant code changes" — saveCalibration() takes
+// them alongside the summary and persists both in one transaction, in
+// `calibrationFrames` (mirrors SessionStore's `sessions`/`frames`
+// split and ADR 0003's reasoning: frames aren't nested in the summary
+// record). Same throttling caveat as `SessionStore.appendFrame`
+// (docs/session-store.md): this store doesn't throttle writes, the
+// caller must (a calibration step already collects readings at
+// whatever rate main.ts's tick() logs them at, ~10Hz).
 
-import { openDatabase, requestToPromise, getAllRecords, CALIBRATIONS_STORE } from "./idb.ts";
-import type { ValidityReport } from "../calibration/index.ts";
+import {
+  openDatabase,
+  requestToPromise,
+  getAllRecords,
+  CALIBRATIONS_STORE,
+  CALIBRATION_FRAMES_STORE,
+  CALIBRATION_FRAMES_CALIBRATION_ID_INDEX,
+} from "./idb.ts";
+import type { ValidityReport, NonFormantStepId, StepReading } from "../calibration/index.ts";
 
 export const CALIBRATION_SCHEMA_VERSION = 1;
 
@@ -51,9 +69,26 @@ export interface Calibration {
   validity: ValidityReport;
 }
 
+/** One raw StepReading, persisted alongside the Calibration it fed
+ * into. No per-reading timestamp — CalibrationEngine's StepReading
+ * doesn't carry one — so ordering within a step relies on the
+ * autoIncrement `frameId` key, which IndexedDB assigns in insertion
+ * order; `getCalibrationFrames` returns them in that order. */
+export interface CalibrationStepFrame {
+  schemaVersion: number;
+  calibrationId: string;
+  stepId: NonFormantStepId;
+  levelDb: number;
+  f0Hz: number | null;
+}
+
 export class CalibrationStore {
+  /** `rawReadingsByStep` is typically built from
+   * `CalibrationEngine.getStepReadings()` for each submitted step —
+   * see the module header for why this store persists them at all. */
   async saveCalibration(
     data: Omit<Calibration, "schemaVersion" | "id" | "timestamp">,
+    rawReadingsByStep: ReadonlyMap<NonFormantStepId, readonly StepReading[]>,
   ): Promise<Calibration> {
     const calibration: Calibration = {
       ...data,
@@ -62,8 +97,24 @@ export class CalibrationStore {
       timestamp: Date.now(),
     };
     const db = await openDatabase();
-    const store = db.transaction(CALIBRATIONS_STORE, "readwrite").objectStore(CALIBRATIONS_STORE);
-    await requestToPromise(store.add(calibration));
+    const tx = db.transaction([CALIBRATIONS_STORE, CALIBRATION_FRAMES_STORE], "readwrite");
+    const writes: Promise<unknown>[] = [
+      requestToPromise(tx.objectStore(CALIBRATIONS_STORE).add(calibration)),
+    ];
+    const framesStore = tx.objectStore(CALIBRATION_FRAMES_STORE);
+    for (const [stepId, readings] of rawReadingsByStep) {
+      for (const reading of readings) {
+        const frame: CalibrationStepFrame = {
+          schemaVersion: CALIBRATION_SCHEMA_VERSION,
+          calibrationId: calibration.id,
+          stepId,
+          levelDb: reading.levelDb,
+          f0Hz: reading.f0Hz,
+        };
+        writes.push(requestToPromise(framesStore.add(frame)));
+      }
+    }
+    await Promise.all(writes);
     return calibration;
   }
 
@@ -80,9 +131,25 @@ export class CalibrationStore {
     return calibrations.length === 0 ? null : calibrations[calibrations.length - 1];
   }
 
+  /** Raw readings for one calibration, in insertion (submission) order
+   * — see calibration.md's recompute-from-raw-data rationale. */
+  async getCalibrationFrames(calibrationId: string): Promise<CalibrationStepFrame[]> {
+    const db = await openDatabase();
+    const store = db
+      .transaction(CALIBRATION_FRAMES_STORE, "readonly")
+      .objectStore(CALIBRATION_FRAMES_STORE);
+    return getAllRecords<CalibrationStepFrame>(
+      store.index(CALIBRATION_FRAMES_CALIBRATION_ID_INDEX),
+      calibrationId,
+    );
+  }
+
   async deleteAll(): Promise<void> {
     const db = await openDatabase();
-    const store = db.transaction(CALIBRATIONS_STORE, "readwrite").objectStore(CALIBRATIONS_STORE);
-    await requestToPromise(store.clear());
+    const tx = db.transaction([CALIBRATIONS_STORE, CALIBRATION_FRAMES_STORE], "readwrite");
+    await Promise.all([
+      requestToPromise(tx.objectStore(CALIBRATIONS_STORE).clear()),
+      requestToPromise(tx.objectStore(CALIBRATION_FRAMES_STORE).clear()),
+    ]);
   }
 }
