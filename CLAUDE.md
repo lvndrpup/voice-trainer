@@ -45,6 +45,16 @@ docs/documentation-standards.md. Summary:
   a claim is unsourced, tag it [likely] or [speculative] in the doc.
 - Relative Markdown links only. No [[wikilinks]] — GitHub won't
   render them.
+- Docs vs. specs. Reference docs (audio-capture.md, spectrogram.md,
+  pitch-detection.md, session-store.md, testing.md, ADRs — anything
+  written/updated in the same commit as the code it describes) plus
+  the code itself and [docs/ledger.md](docs/ledger.md) are the only
+  ground truth for what's actually shipped. roadmap.md, decisions.md,
+  and backlog.md describe intent, not state — they can be
+  aspirational, superseded, or already wrong (decisions.md says so
+  about itself). Read them for direction and context; before treating
+  anything in them as true of the app as it exists right now, verify
+  against code, a reference doc, or ledger.md.
 
 ## Git
 - Conventional Commits for commit messages and PR titles.
@@ -59,10 +69,17 @@ docs/documentation-standards.md. Summary:
   PreToolUse hook (.claude/hooks/check-test-plan.sh) while the PR's
   Test plan section still has unchecked boxes. Only constrains Claude
   Code sessions — merging manually on GitHub is unaffected.
-- `/wizard-review [PR#]` runs four reviewer personas — correctness,
+- `/wizard-review [PR#]` runs reviewer personas — correctness,
   security, simplicity, performance (.claude/agents/wizard-*.md) —
-  independently, then a cross-wizard reaction round, and posts both as
-  comments on the PR. Not automatic; run it when you want it.
+  independently, then a cross-wizard reaction round, then a Scrum
+  Master (.claude/agents/wizard-scrummaster.md) synthesis comment that
+  always runs last regardless of which reviewers ran, and posts these
+  as comments on the PR. Not automatic; run it when you want it. When
+  executing the /wizard-review command, clarify which wizard reviewers
+  to include, which **[effort_level]** they should be using, and
+  whether to post the full discussion or just the Scrum Master's
+  summary. Markdown must look as good as possible for the human readers. 
+
 
 ## Design docs (read when relevant, not by default)
 - docs/roadmap.md      — versions and scope
@@ -81,3 +98,21 @@ docs/documentation-standards.md. Summary:
   modes, what you'd test. If you skipped error handling for brevity,
   say so.
 - Tag uncertain claims [likely] / [speculative]. Say "I don't know."
+
+## Tracking
+Board: GitHub Project "Resonance Scope" (project 1, owner lvndrpup).
+Statuses: Backlog -> Ready -> In Progress -> In Review -> Done.
+Fields: Size (XS/S/M/L), Layer, Started, Finished.
+Milestones = versions from docs/roadmap.md.
+
+Rules:
+- WIP limit is 1 in In Progress. Never start a second item.
+- Ready is capped at 5 items. If Ready is full, build something —
+  don't groom more.
+- An issue is Ready only when it has acceptance criteria, a Size, a
+  Layer, and a milestone.
+- Every PR body includes "Closes #N".
+- Use `gh issue` and `gh project item-edit` to read and update the
+  board. Never invent issue numbers — list them first.
+- Set Started when moving to In Progress, Finished when moving to Done.
+  These two fields are what make cycle time computable.

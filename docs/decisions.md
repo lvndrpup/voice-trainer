@@ -1,6 +1,9 @@
 # Decisions
 
-A running ledger, grouped under Decided / Corrected / Open / Deferred.
+A running log, grouped under Decided / Corrected / Open / Deferred.
+(Not to be confused with [ledger.md](./ledger.md), which records what
+actually shipped rather than what's currently believed — see that
+file, and CLAUDE.md's "Docs vs. specs" rule, for the distinction.)
 
 Every entry here is untested belief until real signal arrives. This
 document existed before any code did, and the first hour of looking at
@@ -183,6 +186,15 @@ for now," not "settled forever."
 - Private repo until v0.1, then public.
 - Conventional Commits, branch per issue, squash merge, even solo.
 - Personal hardware only. Never work hardware.
+- GitHub Project board ("Resonance Scope", project 1) tracks work:
+  Backlog → Ready → In Progress → In Review → Done, with a WIP limit
+  of 1 in In Progress and a 5-item cap on Ready, so the board can't
+  silently fill up with half-groomed intentions. Milestones map to
+  roadmap.md versions. See CLAUDE.md's "Tracking" section for the
+  full field/rule list. This had already been in informal use for a
+  cycle before it was written down here — CLAUDE.md's rule is that
+  docs land in the same commit as the code they describe, and process
+  conventions are no exception, they'd just been missed once.
 
 ## Corrected
 
@@ -230,6 +242,14 @@ for now," not "settled forever."
   slide's own top. [likely] — a reasonable reading of the two step
   descriptions, not a specified formula; revisit if it produces
   obviously-wrong ranges once there's real calibration data to look at.
+- Spectrogram log-axis range: the shipped default
+  (`computeLogFrequencyBins` in `src/dsp/index.ts`) runs 20Hz to
+  Nyquist, with no `maxFrequencyHz` parameter at all. GitHub issue #2's
+  acceptance criteria mandate a 60Hz-8kHz axis instead — a real gap
+  between spec and shipped code, surfaced during that issue's grooming
+  and left unresolved there. Needs a product call: add a max-cap
+  parameter and change the defaults, or update the issue to match
+  shipped behavior. See [spectrogram.md](./spectrogram.md) and issue #2.
 - `FeatureFrame.peakDb` can legitimately be `-Infinity` (a silent
   frame — `peakDb()` in `main.ts` starts there and only rises if a
   spectrum bin has energy), but `sessionsToExportJson()` uses

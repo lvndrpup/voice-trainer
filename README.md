@@ -12,6 +12,8 @@ The app describes what it hears; it doesn't grade you. There are no scores, no p
 
 v0.2 (of the plan in [docs/roadmap.md](docs/roadmap.md)): mic capture, a scrolling log-frequency spectrogram, a live F0 readout, and IndexedDB session storage with export/delete. Still pre-1.0 — expect rough edges, and see the roadmap for what's next.
 
+This paragraph is a snapshot, not a live source — the roadmap describes *intent* and can drift out of date. [docs/ledger.md](docs/ledger.md) is the append-only, per-issue record of what's actually shipped, anchored to real commit SHAs.
+
 ## Getting started
 
 ```
@@ -29,14 +31,15 @@ Opens at `http://localhost:5173`. Click **Start capture**, allow microphone acce
 | `npm run lint` | ESLint (flat config, `typescript-eslint` strict + stylistic) |
 | `npm run typecheck` | `tsc -b` |
 | `npm run test` | Unit tests (Node's built-in test runner) over pure functions — DSP and export serialization |
+| `npm run test:e2e` | Playwright, against a real headless Chromium with a synthetic mic — the browser-only paths (`getUserMedia`, IndexedDB) `npm run test` can't reach |
 | `npm run build` | Typecheck, then production build |
 | `npm run preview` | Serve the production build locally |
 
-Browser-only code (Web Audio, IndexedDB) can't run under Node, so `npm run test` doesn't cover it — today that's exercised manually in-browser rather than by an automated suite. See [docs/index.md](docs/index.md) for the full documentation set.
+See [docs/testing.md](docs/testing.md) for what each suite actually covers, and [docs/index.md](docs/index.md) for the full documentation set.
 
 ## Architecture
 
-Vite + TypeScript, no UI framework, Canvas 2D. Four modules with enforced boundaries — `src/audio` (Web Audio, the only place that touches it), `src/dsp` (pure functions, headlessly testable), `src/render` (Canvas), `src/store` (IndexedDB, every persisted type carries a `schemaVersion`). Full details, the layer model, and every ADR are in [docs/index.md](docs/index.md) — start there for anything architectural.
+Vite + TypeScript, no UI framework, Canvas 2D. Modules with enforced import boundaries — `src/audio` (Web Audio, the only place that touches it), `src/dsp` (pure functions, headlessly testable), `src/render` (Canvas), `src/store` (IndexedDB, every persisted type carries a `schemaVersion`). Full details, the current module list, the layer model, and every ADR are in [docs/index.md](docs/index.md) — start there for anything architectural, since the list here goes stale the moment a new module lands and this file isn't the source of truth for it (see "Docs vs. specs," below).
 
 ## Contributing
 
@@ -45,6 +48,7 @@ Solo project today, but it's built to hold up if that changes:
 - Conventional Commits, one branch per issue (`feat/`, `fix/`, `docs/`, `chore/` + a short kebab description), squash merge.
 - Every PR-sized change updates docs in the same commit — see [docs/documentation-standards.md](docs/documentation-standards.md).
 - PRs use [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md): every test plan item needs concrete steps, where to look, and the expected result, not just a checkbox.
+- **Docs vs. specs**: reference docs (the ones listed in [docs/index.md](docs/index.md), written alongside the code they describe) plus the code itself and [docs/ledger.md](docs/ledger.md) are ground truth for what's actually shipped. [docs/roadmap.md](docs/roadmap.md), [docs/decisions.md](docs/decisions.md), and [docs/backlog.md](docs/backlog.md) describe intent — useful for direction, not proof something exists. See CLAUDE.md's "Docs vs. specs" rule.
 
 If you're working in this repo with [Claude Code](https://claude.com/claude-code), two pieces of repo-specific tooling live in `.claude/`:
 
