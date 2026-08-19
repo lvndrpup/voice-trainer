@@ -10,7 +10,7 @@ import {
   MicrophoneConstraintsUnsupportedError,
   AudioContextSuspendedError,
 } from "./audio";
-import { computeLogFrequencyBins } from "./dsp";
+import { computeLogFrequencyBins, detectPitch } from "./dsp";
 import { SpectrogramRenderer } from "./render";
 
 // T is set by the caller's explicit type argument (mirrors DOM's own
@@ -26,6 +26,7 @@ function requireElement<T extends Element>(selector: string): T {
 
 const button = requireElement<HTMLButtonElement>("#mic-toggle");
 const peakEl = requireElement<HTMLSpanElement>("#peak-db");
+const f0El = requireElement<HTMLSpanElement>("#f0-hz");
 const statusEl = requireElement<HTMLParagraphElement>("#mic-status");
 const canvas = requireElement<HTMLCanvasElement>("#spectrogram");
 
@@ -47,6 +48,10 @@ function tick(): void {
   if (info) {
     const logBins = computeLogFrequencyBins(spectrum, info.sampleRate, canvas.height);
     spectrogram.pushColumn(logBins);
+
+    const waveform = capture.getWaveform();
+    const f0 = detectPitch(waveform, info.sampleRate);
+    f0El.textContent = f0 !== null ? f0.toFixed(1) : "—";
   }
 
   const peak = peakDb(spectrum);
@@ -96,6 +101,7 @@ async function handleStop(): Promise<void> {
   }
   await capture.stop();
   peakEl.textContent = "—";
+  f0El.textContent = "—";
   statusEl.textContent = "Stopped";
   button.textContent = "Start capture";
   spectrogram.clear();
