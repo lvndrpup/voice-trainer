@@ -89,13 +89,14 @@ matching the rest of `main.ts`'s error-handling pattern.
 
 ## Known gaps
 
-- **No automated tests for the IndexedDB-touching methods.** Node has
-  no built-in `indexedDB` global (confirmed by testing this directly —
-  `typeof indexedDB` is `"undefined"` under Node 24). Only
-  `sessionsToExportJson()` is unit tested. The rest needs manual
-  verification in a real browser. A polyfill (`fake-indexeddb`) would
-  close this gap but is a new dependency, not added without asking —
-  same treatment as the untestable parts of `src/audio`.
+- **Node has no built-in `indexedDB` global** (confirmed by testing
+  this directly — `typeof indexedDB` is `"undefined"` under Node 24),
+  so `SessionStore` itself still has no Node-level unit tests; only
+  `sessionsToExportJson()` is. The end-to-end paths that touch
+  IndexedDB through the real UI — session start/stop/frame-logging,
+  export, delete-all — now have automated coverage instead, via
+  Playwright against a real headless browser. See
+  [testing.md](./testing.md) for what runs and how.
 - **No storage-quota handling.** A `QuotaExceededError` from IndexedDB
   would propagate as an unhandled `SessionStoreError` (not silently
   swallowed — consistent with this project's error-handling stance —

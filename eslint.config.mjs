@@ -39,6 +39,15 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+  // e2e specs run under Node (the Playwright test runner) but also
+  // contain page.evaluate() callbacks that execute in the browser —
+  // both global sets apply within the same file.
+  {
+    files: ["playwright.config.ts", "e2e/**/*.ts"],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+  },
   // Module boundaries per CLAUDE.md's Architecture section. Only the
   // explicitly stated restrictions are enforced — src/store has no stated
   // import restriction, so none is added here.
