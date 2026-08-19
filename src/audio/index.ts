@@ -109,6 +109,7 @@ export class MicrophoneCapture {
   #sourceNode: MediaStreamAudioSourceNode | null = null;
   #analyser: AnalyserNode | null = null;
   #spectrumBuffer: Float32Array<ArrayBuffer> | null = null;
+  #waveformBuffer: Float32Array<ArrayBuffer> | null = null;
   #info: MicrophoneCaptureInfo | null = null;
 
   constructor(options: MicrophoneCaptureOptions = {}) {
@@ -130,9 +131,15 @@ export class MicrophoneCapture {
       );
     }
 
-    if (this.#state === "suspended" && this.#audioContext && this.#stream) {
+    if (
+      this.#state === "suspended" &&
+      this.#audioContext &&
+      this.#stream &&
+      this.#analyser
+    ) {
       await this.#ensureRunning(this.#audioContext);
       this.#info = this.#buildInfo(this.#stream, this.#audioContext);
+      this.#allocateBuffers(this.#analyser);
       this.#state = "active";
       return this.#info;
     }
@@ -173,7 +180,7 @@ export class MicrophoneCapture {
     this.#stream = stream;
     this.#sourceNode = sourceNode;
     this.#analyser = analyser;
-    this.#spectrumBuffer = new Float32Array(analyser.frequencyBinCount);
+    this.#allocateBuffers(analyser);
     this.#state = "active";
     return this.#info;
   }
@@ -195,6 +202,7 @@ export class MicrophoneCapture {
     this.#sourceNode = null;
     this.#analyser = null;
     this.#spectrumBuffer = null;
+    this.#waveformBuffer = null;
     this.#info = null;
     this.#state = "stopped";
 
@@ -211,6 +219,23 @@ export class MicrophoneCapture {
     }
     this.#analyser.getFloatFrequencyData(this.#spectrumBuffer);
     return this.#spectrumBuffer;
+  }
+
+  /** Time-domain samples (waveform), for algorithms like pitch detection
+   * that need the signal itself rather than its frequency spectrum. */
+  getWaveform(): Float32Array<ArrayBuffer> {
+    if (this.#state !== "active" || !this.#analyser || !this.#waveformBuffer) {
+      throw new MicrophoneCaptureStateError(
+        `getWaveform() called while state is "${this.#state}"; call and await start() first.`,
+      );
+    }
+    this.#analyser.getFloatTimeDomainData(this.#waveformBuffer);
+    return this.#waveformBuffer;
+  }
+
+  #allocateBuffers(analyser: AnalyserNode): void {
+    this.#spectrumBuffer = new Float32Array(analyser.frequencyBinCount);
+    this.#waveformBuffer = new Float32Array(analyser.fftSize);
   }
 
   #buildInfo(stream: MediaStream, audioContext: AudioContext): MicrophoneCaptureInfo {

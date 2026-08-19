@@ -127,6 +127,15 @@ for now," not "settled forever."
   landed as `computeLogFrequencyBins` — linear interpolation between
   the two nearest linear FFT bins, log2-spaced across
   `[minFrequencyHz, nyquist]`. See [spectrogram.md](./spectrogram.md).
+- Live F0 readout landed as `detectPitch` — normalized autocorrelation
+  (NSDF, McLeod Pitch Method), first-local-maximum peak selection
+  rather than global-maximum, to avoid octave errors. The project's own
+  sine-wave unit tests caught two real bugs before ship: a whole-window
+  energy normalization that penalized larger lags, and a global-max
+  search that locked onto half the true frequency. See
+  [pitch-detection.md](./pitch-detection.md). v0.1 is now complete per
+  [roadmap.md](./roadmap.md)'s criterion (mic capture, spectrogram, and
+  F0 readout all run; nothing is stored).
 - Streak ban was initially blanket. Narrowed: adherence streaks are
   fine and probably good (practice frequency is the real predictor);
   performance streaks remain forbidden.

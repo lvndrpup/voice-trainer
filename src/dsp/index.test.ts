@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeLogFrequencyBins } from "./index.ts";
+import { computeLogFrequencyBins, detectPitch } from "./index.ts";
+
+function sineWave(frequencyHz: number, sampleRate: number, length: number): Float32Array {
+  const samples = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    samples[i] = Math.sin((2 * Math.PI * frequencyHz * i) / sampleRate);
+  }
+  return samples;
+}
 
 void test("computeLogFrequencyBins: constant input maps to constant output", () => {
   const input = new Float32Array(512).fill(-42);
@@ -59,4 +67,53 @@ void test("computeLogFrequencyBins: rejects minFrequencyHz outside (0, nyquist)"
   const input = new Float32Array(512);
   assert.throws(() => computeLogFrequencyBins(input, 48000, 10, { minFrequencyHz: 0 }));
   assert.throws(() => computeLogFrequencyBins(input, 48000, 10, { minFrequencyHz: 24000 }));
+});
+
+void test("detectPitch: recovers the frequency of a pure sine wave", () => {
+  const sampleRate = 48000;
+  for (const frequencyHz of [110, 220, 440]) {
+    const samples = sineWave(frequencyHz, sampleRate, 2048);
+    const detected = detectPitch(samples, sampleRate);
+    assert.ok(detected !== null, `expected a pitch for ${frequencyHz}Hz, got null`);
+    assert.ok(
+      Math.abs(detected - frequencyHz) < 1,
+      `expected ~${frequencyHz}Hz, got ${detected}`,
+    );
+  }
+});
+
+void test("detectPitch: returns null for silence", () => {
+  const samples = new Float32Array(2048);
+  assert.equal(detectPitch(samples, 48000), null);
+});
+
+void test("detectPitch: returns null for white noise (not confidently periodic)", () => {
+  const samples = new Float32Array(2048);
+  // Deterministic pseudo-random noise, not a real PRNG dependency — just
+  // needs to be non-periodic, not cryptographically random.
+  let seed = 42;
+  for (let i = 0; i < samples.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    samples[i] = (seed / 0x7fffffff) * 2 - 1;
+  }
+  assert.equal(detectPitch(samples, 48000), null);
+});
+
+void test("detectPitch: returns null when the window is too short for the frequency range", () => {
+  const samples = sineWave(220, 48000, 8);
+  assert.equal(detectPitch(samples, 48000), null);
+});
+
+void test("detectPitch: rejects invalid options", () => {
+  const samples = sineWave(220, 48000, 2048);
+  assert.throws(() => detectPitch(samples, 48000, { minFrequencyHz: 0 }));
+  assert.throws(() =>
+    detectPitch(samples, 48000, { minFrequencyHz: 1000, maxFrequencyHz: 500 }),
+  );
+  assert.throws(() => detectPitch(samples, 48000, { clarityThreshold: 0 }));
+  assert.throws(() => detectPitch(samples, 48000, { clarityThreshold: 1.5 }));
+});
+
+void test("detectPitch: rejects a too-short sample array", () => {
+  assert.throws(() => detectPitch(new Float32Array(1), 48000));
 });
