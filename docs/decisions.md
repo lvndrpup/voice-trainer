@@ -70,9 +70,37 @@ for now," not "settled forever."
 - No population priors are obtainable without a backend, so they must
   come from published literature or an explicit opt-in export. Do not
   quietly abandon the no-backend rule to solve this.
+- TypeScript is pinned to the 6.x line (`^6.0.3`), not the native 7.x
+  compiler the scaffold happened to install. `typescript-eslint` cannot
+  run against TS7 at all yet — confirmed by testing, not assumed, and
+  corroborated by a typescript-eslint maintainer: there is no stable
+  JS-consumable API for TS7/`tsgo` for tools to hook into (see
+  [typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+  Verified TS6 and TS7 generate identical `lib.dom.d.ts` typings for the
+  spots `src/audio/index.ts` depends on, so the downgrade is behaviorally
+  inert beyond unlocking lint. Revisit once that issue closes — TS7's
+  native compiler is faster and the only reason to stay on 6.x is this
+  tooling gap, not a preference.
+- ESLint (flat config) + `typescript-eslint`'s `strictTypeChecked` and
+  `stylisticTypeChecked` rule sets, no Prettier. Prettier was
+  considered and skipped for now: it's a second dependency purely for
+  formatting on a solo project with no style disputes to arbitrate, and
+  `stylisticTypeChecked` already covers TS-idiomatic pattern rules
+  (though not whitespace/wrapping). Revisit if a second contributor
+  joins or manual formatting drift becomes annoying enough to matter.
+- Module boundaries (`src/audio`/`dsp`/`render` above) are enforced by
+  `no-restricted-imports` rules in `eslint.config.mjs`, scoped to only
+  the restrictions CLAUDE.md actually states — `src/store` has no
+  stated import restriction, so none is enforced for it.
 
 ## Decided — process
 
+- GitHub Actions CI runs lint, typecheck (`tsc -b`), and build on every
+  PR and push to `main`. No test step: there's no test framework
+  installed, and browser-API code in `src/audio` can't run headlessly
+  anyway (no mic/AudioContext in Node or CI, jsdom has neither). This
+  reverses part of the GitHub Actions deferral below — Terraform,
+  Ansible + Molecule, Vault, and Artifactory remain deferred.
 - Documentation is part of the definition of done and goes in the same
   commit as the code.
 - SSH auth (ed25519, passphrase, shared agent socket). Account
@@ -119,9 +147,9 @@ for now," not "settled forever."
 ## Deferred
 
 - Golden-file fixtures until custom DSP.
-- GitHub Actions, Terraform, Ansible + Molecule, Vault, Artifactory.
-  RHEL practice will come via podman + Molecule containers, not from
-  the dev shell.
+- Terraform, Ansible + Molecule, Vault, Artifactory. RHEL practice will
+  come via podman + Molecule containers, not from the dev shell.
+  (GitHub Actions itself is no longer deferred — see Decided — process.)
 
 ## Known biases in this plan
 

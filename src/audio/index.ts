@@ -130,10 +130,11 @@ export class MicrophoneCapture {
       );
     }
 
-    if (this.#state === "suspended" && this.#audioContext) {
+    if (this.#state === "suspended" && this.#audioContext && this.#stream) {
       await this.#ensureRunning(this.#audioContext);
+      this.#info = this.#buildInfo(this.#stream, this.#audioContext);
       this.#state = "active";
-      return this.#info!;
+      return this.#info;
     }
 
     this.#state = "permission-requested";
@@ -167,20 +168,7 @@ export class MicrophoneCapture {
       throw err;
     }
 
-    const track = stream.getAudioTracks()[0];
-    const settings = track.getSettings();
-    this.#info = {
-      deviceId: settings.deviceId ?? null,
-      label: track.label,
-      sampleRate: audioContext.sampleRate,
-      channelCount: settings.channelCount ?? 1,
-      echoCancellation:
-        typeof settings.echoCancellation === "boolean"
-          ? settings.echoCancellation
-          : null,
-      noiseSuppression: settings.noiseSuppression ?? null,
-      autoGainControl: settings.autoGainControl ?? null,
-    };
+    this.#info = this.#buildInfo(stream, audioContext);
     this.#audioContext = audioContext;
     this.#stream = stream;
     this.#sourceNode = sourceNode;
@@ -195,7 +183,9 @@ export class MicrophoneCapture {
       return;
     }
 
-    this.#stream?.getTracks().forEach((track) => track.stop());
+    this.#stream?.getTracks().forEach((track) => {
+      track.stop();
+    });
     this.#sourceNode?.disconnect();
     this.#analyser?.disconnect();
     const ctx = this.#audioContext;
@@ -221,6 +211,23 @@ export class MicrophoneCapture {
     }
     this.#analyser.getFloatFrequencyData(this.#spectrumBuffer);
     return this.#spectrumBuffer;
+  }
+
+  #buildInfo(stream: MediaStream, audioContext: AudioContext): MicrophoneCaptureInfo {
+    const track = stream.getAudioTracks()[0];
+    const settings = track.getSettings();
+    return {
+      deviceId: settings.deviceId ?? null,
+      label: track.label,
+      sampleRate: audioContext.sampleRate,
+      channelCount: settings.channelCount ?? 1,
+      echoCancellation:
+        typeof settings.echoCancellation === "boolean"
+          ? settings.echoCancellation
+          : null,
+      noiseSuppression: settings.noiseSuppression ?? null,
+      autoGainControl: settings.autoGainControl ?? null,
+    };
   }
 
   async #ensureRunning(ctx: AudioContext): Promise<void> {
