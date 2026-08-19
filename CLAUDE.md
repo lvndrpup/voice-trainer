@@ -47,6 +47,11 @@ docs/documentation-standards.md. Summary:
 - Conventional Commits for commit messages and PR titles.
 - Branches: feat/ fix/ docs/ chore/ + short-kebab-description.
 - One issue per branch. Squash merge.
+- PRs use .github/PULL_REQUEST_TEMPLATE.md. Every test plan item needs
+  concrete steps, where to look, and the expected result — not just a
+  pass/fail checkbox. If something can't be verified in this
+  environment (no browser, no real mic), say so explicitly and leave
+  it unchecked rather than skipping it.
 
 ## Design docs (read when relevant, not by default)
 - docs/roadmap.md      — versions and scope
