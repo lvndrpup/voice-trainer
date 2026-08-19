@@ -26,6 +26,9 @@ Vite + TypeScript. No UI framework. Canvas 2D.
                   Audio. Must run headlessly in Node.
 - `src/render/` — Canvas drawing. No audio imports.
 - `src/store/`  — IndexedDB. All persisted types carry schemaVersion.
+- `src/calibration/` — pure step-sequencing/validity logic for the
+                  calibration wizard. No DOM, no Web Audio, no Canvas.
+                  Must run headlessly in Node.
 
 Do not add dependencies without asking. Do not add a framework.
 

@@ -107,6 +107,62 @@ for now," not "settled forever."
   `no-restricted-imports` rules in `eslint.config.mjs`, scoped to only
   the restrictions CLAUDE.md actually states — `src/store` has no
   stated import restriction, so none is enforced for it.
+- v0.3's first PR adds a fourth pure module, `src/calibration/` — the
+  step-sequencing/validity engine for the 6-step calibration protocol.
+  Same testability charter as `src/dsp` (headless, no DOM/Web Audio/
+  Canvas) but for a multi-step state machine rather than stateless
+  signal processing, so it's its own module rather than folded into
+  `dsp`. May import `dsp`; may not import `audio`/`render`/`store`
+  (enforced the same way as the existing boundaries). One deliberate
+  exception to the "calibration touches nothing else" rule:
+  `src/store/calibration.ts` imports the `ValidityReport` type *from*
+  `src/calibration`, since that module is what actually produces one —
+  allowed because `src/store` has no import restriction of its own.
+  See [ADR 0004](./adr/0004-calibration-module-boundary.md) and
+  [calibration-store.md](./calibration-store.md).
+- `src/store/index.ts`'s `openDatabase()`/`requestToPromise()`/
+  `getRecord()`/`getAllRecords()` helpers moved to `src/store/idb.ts`
+  once `CalibrationStore` needed the same open()/request-wrapping
+  logic against the same physical `resonance-scope` database.
+  `SessionStore`'s public behavior is unchanged. `idb.ts` is also now
+  the one place that knows every object store name across the app,
+  since IndexedDB requires all of one version's schema changes to
+  happen inside a single `onupgradeneeded` callback — `DATABASE_VERSION`
+  bumped 1 → 3 across this PR (2 added `calibrations`, 3 added
+  `calibrationFrames` — see next entry), each additively (existing
+  data untouched).
+- `Calibration` (`src/store/calibration.ts`) deviates from
+  calibration.md's documented interface in two small schema-shape
+  ways: `deviceId` is `string | null` rather than `string`, matching
+  what `MicrophoneCaptureInfo.deviceId` (`src/audio`) can actually
+  provide rather than inventing a placeholder; and an `id: string`
+  primary key was added, since IndexedDB needs a `keyPath` and the
+  documented interface didn't specify one. A third, functional gap —
+  calibration.md also asks to store raw feature frames, not just the
+  summary, "so old calibrations can be recomputed when the formant
+  code changes" — was initially missed entirely (not even listed as a
+  deviation) and caught by `/wizard-review`'s correctness pass on the
+  PR before merge, not by the author. Closed in the same PR: a second
+  object store, `calibrationFrames`, persists each step's raw
+  `StepReading`s alongside the summary. See
+  [calibration-store.md](./calibration-store.md).
+- `/wizard-review` on that same PR also caught a second real issue:
+  the PR's own commit had added a `## Tracking` section to CLAUDE.md
+  (GitHub Project board workflow) — content unrelated to "calibration
+  data layer," which had ended up in the working tree uncommitted
+  before the PR branch was even created and rode along into the
+  commit untouched, since the edit that added the actual
+  calibration-related bullet only touched its own hunk. Pulled back
+  out and re-landed as its own `chore:` PR instead. Lesson: a
+  file-level diff review (not just "does my intended hunk look right")
+  would have caught this before the review round did.
+- Calibration's wizard UI (`index.html`/`main.ts` wiring) is
+  deliberately not part of v0.3's first PR — see calibration.md's
+  6 steps, of which only 0/1/2/4/5 have a producer so far (step 3
+  needs LPC formants, a separate PR). CLAUDE.md: "No half-finished
+  implementations either" — a wizard button a user could open but
+  never complete would be exactly that, so the whole wizard ships in
+  one PR once step 3 exists, atomically.
 
 ## Decided — process
 
@@ -178,6 +234,14 @@ for now," not "settled forever."
 
 ## Open
 
+- How `dsp.estimateComfortableF0Range` combines calibration.md's steps
+  4 (greeting-register top) and 5 (hum slide) into one range isn't
+  specified by that doc — only what each step individually produces.
+  Current implementation: floor = the hum slide's own low end,
+  ceiling = the higher of the greeting-register top and the hum
+  slide's own top. [likely] — a reasonable reading of the two step
+  descriptions, not a specified formula; revisit if it produces
+  obviously-wrong ranges once there's real calibration data to look at.
 - Spectrogram log-axis range: the shipped default
   (`computeLogFrequencyBins` in `src/dsp/index.ts`) runs 20Hz to
   Nyquist, with no `maxFrequencyHz` parameter at all. GitHub issue #2's

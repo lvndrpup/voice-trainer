@@ -4,6 +4,13 @@ Reference doc for `src/store/index.ts`. For why the schema is shaped
 this way, see
 [ADR 0003](./adr/0003-session-persistence-schema.md).
 
+The low-level `openDatabase()`/`requestToPromise()`/`getRecord()`/
+`getAllRecords()` helpers, and the `resonance-scope` database's object
+store names, live in `src/store/idb.ts` — split out once
+[`src/store/calibration.ts`](./calibration-store.md) needed the same
+open()/request-wrapping logic against the same physical database.
+`SessionStore`'s public API and behavior are unchanged by that split.
+
 ## Schema
 
 ```typescript
