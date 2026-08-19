@@ -75,7 +75,7 @@ docs/documentation-standards.md. Summary:
   executing the /wizard-review command, clarify which wizard reviewers
   to include, which **[effort_level]** they should be using, and
   whether to post the full discussion or just the Scrum Master's
-  summary.
+  summary. Markdown must look as good as possible for the human readers. 
 
 
 ## Design docs (read when relevant, not by default)
