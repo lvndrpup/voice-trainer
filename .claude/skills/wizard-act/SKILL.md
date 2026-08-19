@@ -21,6 +21,8 @@ Same rule as `wizard-review`: if an argument looks like a number, that's the PR;
 
 If there's no Scrum Master comment on the PR, tell the user this PR hasn't been through `/wizard-review` (or the comment predates it) and ask whether to proceed on human comments alone or stop.
 
+If a Scrum Master comment exists but there are zero wizard comments, `wizard-review` ran in "summary only" posting mode — there's no file:line detail to reconcile, only the SM's tally and 1-2 sentence bottom line. Don't invent findings from that prose, and don't silently do nothing either: tell the user this is the case and ask (`AskUserQuestion`) whether to proceed treating the SM's bottom line as the sole input, or stop so they can re-run `/wizard-review` in full-discussion mode first.
+
 ## 3. Reconcile against current code — don't trust the comments blindly
 
 Comments can be stale by the time you run this (more commits may have landed since). For each finding with a concrete file:line claim:
