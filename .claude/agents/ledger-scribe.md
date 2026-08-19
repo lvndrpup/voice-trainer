@@ -26,8 +26,11 @@ Given a PR number (or find the most recently merged PR yourself via
    existing rows' convention — never invent a link.
 5. Write "What shipped" as one line, plain language, matching the
    terseness of existing rows (see the History table for tone/length).
-6. Add the row to the END of the `## Ledger` table (append-only, in
-   merge order). Do not reorder or edit any existing row.
+6. Before writing, check whether `docs/ledger.md` already has a row
+   for this PR number — if so, stop and say so instead of adding a
+   duplicate. Otherwise add the row to the END of the `## Ledger`
+   table (append-only, in merge order). Do not reorder or edit any
+   existing row.
 7. If the PR's `Closes #N` didn't auto-close the issue (check
    `gh issue view N --json state`), close it: `gh issue close N`.
 
