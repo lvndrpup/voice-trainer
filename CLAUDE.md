@@ -69,7 +69,8 @@ docs/documentation-standards.md. Summary:
 - `/wizard-review [PR#]` runs four reviewer personas — correctness,
   security, simplicity, performance (.claude/agents/wizard-*.md) —
   independently, then a cross-wizard reaction round, and posts both as
-  comments on the PR. Not automatic; run it when you want it.
+  comments on the PR. Not automatic; run it when you want it. When executing the /wizard-review command, clarify which wizard reviewers to include and which **[effort_level]** they should be using. 
+
 
 ## Design docs (read when relevant, not by default)
 - docs/roadmap.md      — versions and scope
