@@ -36,7 +36,8 @@ straight to a drafted agent file, no milestone needed.
 - **ledger-scribe** — appends the correct `docs/ledger.md` row after a
   PR merges, per that file's own "How to add a row" process (currently
   a manual step). Project-specific, not pulled from an external
-  pattern.
+  pattern. Drafted at `.claude/agents/ledger-scribe.md`, not yet run
+  end-to-end.
 - **debugger** — reproduces and root-causes a *live* failure (a flaky
   Playwright run, a spectrogram artifact), distinct from `reviewer`'s
   diff-vs-criteria job.
