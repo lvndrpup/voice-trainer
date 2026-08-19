@@ -18,8 +18,10 @@ runs client-side: audio never leaves the browser.
 - [Audio capture](./audio-capture.md) — mic capture module: API, audio graph, state machine
 - [Spectrogram](./spectrogram.md) — log-frequency bin remapping and the scrolling canvas renderer
 - [Pitch detection](./pitch-detection.md) — the autocorrelation-based F0 estimator
+- [Session store](./session-store.md) — IndexedDB schema and the SessionStore API
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record
 - [ADR 0002: Raw getUserMedia constraints (AGC off)](./adr/0002-agc-off-raw-constraints.md) — architecture decision record
+- [ADR 0003: Session persistence schema](./adr/0003-session-persistence-schema.md) — architecture decision record
 
 ## Layer model
 
