@@ -78,7 +78,12 @@ docs/documentation-standards.md. Summary:
   executing the /wizard-review command, clarify which wizard reviewers
   to include, which **[effort_level]** they should be using, and
   whether to post the full discussion or just the Scrum Master's
-  summary. Markdown must look as good as possible for the human readers. 
+  summary. Markdown must look as good as possible for the human readers.
+- `/wizard-act [PR#]` follows up a `/wizard-review` pass: reads the
+  Scrum Master's bottom line plus every wizard/human comment, checks
+  which findings still hold against current code, then enters plan
+  mode to propose concrete fixes for approval before editing anything.
+  Also not automatic — run it yourself once you've read the review.
 
 
 ## Design docs (read when relevant, not by default)
