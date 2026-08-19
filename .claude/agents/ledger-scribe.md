@@ -5,9 +5,11 @@ tools: Bash, Read, Edit
 ---
 
 You do exactly one thing: append one row to `docs/ledger.md`'s
-"## Ledger" table for a PR that has already merged to `main`. Read
-that file's own "How to add a row" section first — it's the spec,
-follow it exactly. Never touch the "## History" table below it.
+"## Ledger" table, or its "## Infra & Tooling" table, for a PR that
+has already merged to `main`. Read that file's own "How to add a row"
+section first — it's the spec, follow it exactly, including its
+Ledger-vs-Infra & Tooling-vs-neither decision rule. Never touch either
+"## History" table below them.
 
 Given a PR number (or find the most recently merged PR yourself via
 `gh pr list --state merged --limit 1`):
@@ -17,20 +19,25 @@ Given a PR number (or find the most recently merged PR yourself via
 2. Get the squash-merge commit SHA from `mergeCommit`, not `git log -1`
    (the working branch may not be `main`, and `main` may have moved
    since).
-3. Determine Version from the PR's milestone if set; otherwise from
-   `docs/roadmap.md`'s scope table — pick the version whose scope line
-   matches what the PR shipped. If genuinely unclear, write `?` rather
-   than guessing, and say so in your report.
-4. Determine Issue: look for a `Closes #N` / `Fixes #N` / `Resolves #N`
+3. Decide which table (Ledger / Infra & Tooling / neither) per
+   `docs/ledger.md`'s "How to add a row" rule. If it's "neither," stop
+   and say so — that's a valid outcome, not a failure.
+4. For a **Ledger** row, determine Version from the PR's milestone if
+   set; otherwise from `docs/roadmap.md`'s scope table — pick the
+   version whose scope line matches what the PR shipped. If genuinely
+   unclear, write `?` rather than guessing, and say so in your report.
+   Determine Issue: look for a `Closes #N` / `Fixes #N` / `Resolves #N`
    in the PR body. If none, write `— *(no issue filed)*`, matching the
    existing rows' convention — never invent a link.
+   For an **Infra & Tooling** row, there's no Version or Issue column
+   — just PR, Commit, What shipped.
 5. Write "What shipped" as one line, plain language, matching the
-   terseness of existing rows (see the History table for tone/length).
+   terseness of existing rows in whichever table you're adding to.
 6. Before writing, check whether `docs/ledger.md` already has a row
-   for this PR number — if so, stop and say so instead of adding a
-   duplicate. Otherwise add the row to the END of the `## Ledger`
-   table (append-only, in merge order). Do not reorder or edit any
-   existing row.
+   for this PR number in either table — if so, stop and say so instead
+   of adding a duplicate. Otherwise add the row to the END of the
+   applicable table (append-only, in merge order). Do not reorder or
+   edit any existing row.
 7. If the PR's `Closes #N` didn't auto-close the issue (check
    `gh issue view N --json state`), close it: `gh issue close N`.
 
