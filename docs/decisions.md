@@ -107,12 +107,19 @@ for now," not "settled forever."
 
 ## Decided — process
 
-- GitHub Actions CI runs lint, typecheck (`tsc -b`), and build on every
-  PR and push to `main`. No test step: there's no test framework
-  installed, and browser-API code in `src/audio` can't run headlessly
-  anyway (no mic/AudioContext in Node or CI, jsdom has neither). This
-  reverses part of the GitHub Actions deferral below — Terraform,
-  Ansible + Molecule, Vault, and Artifactory remain deferred.
+- GitHub Actions CI runs lint, typecheck (`tsc -b`), unit tests
+  (`node --test`), and build on every PR and push to `main`, plus a
+  separate `e2e` job running Playwright against a real headless
+  Chromium. This reverses part of the GitHub Actions deferral below —
+  Terraform, Ansible + Molecule, Vault, and Artifactory remain
+  deferred.
+- Playwright (real headless Chromium, Chromium's
+  `--use-fake-device-for-media-stream` flag for a synthetic mic) over
+  a `fake-indexeddb` polyfill for the parts of the app that touch
+  IndexedDB and `getUserMedia`. `fake-indexeddb` would only ever prove
+  `SessionStore` matches its own idea of IndexedDB's behavior; a real
+  browser proves the actual app (button clicks, `main.ts`'s wiring,
+  the real `indexedDB` global) does. See [testing.md](./testing.md).
 - Documentation is part of the definition of done and goes in the same
   commit as the code.
 - SSH auth (ed25519, passphrase, shared agent socket). Account
@@ -159,6 +166,16 @@ for now," not "settled forever."
 
 ## Open
 
+- `FeatureFrame.peakDb` can legitimately be `-Infinity` (a silent
+  frame — `peakDb()` in `main.ts` starts there and only rises if a
+  spectrum bin has energy), but `sessionsToExportJson()` uses
+  `JSON.stringify`, which serializes `-Infinity` as `null` — silently
+  violating the field's `number` (non-nullable) type in the exported
+  file. Found by `e2e/session-lifecycle.spec.ts` against a real
+  `AnalyserNode`, not fixed here — fixing it means deciding whether
+  `peakDb` becomes `number | null` (a schema version bump, mirroring
+  how `f0Hz` already handles "no signal") or `main.ts` clamps before
+  storing, and that's a product call, not a testing-PR call.
 - Whether H1-H2 survives mic-response confounds well enough to justify
   the formant-correction work.
 - Where exercise content comes from — needs a real SLP source.
