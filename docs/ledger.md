@@ -52,9 +52,7 @@ issue merges:
 
 | Version | Issue | PR | Commit | What shipped |
 |---|---|---|---|---|
-
-*(Empty until the next PR merges after this file exists — see
-"History" below for everything that shipped before it did.)*
+| v0.3 | #17 | #18 | `f686930` | Calibration step-sequencing engine (steps 0/1/2/4/5) + CalibrationStore; SessionStore split into idb.ts |
 
 ## History (pre-dates this file)
 
