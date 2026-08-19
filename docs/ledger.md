@@ -38,21 +38,52 @@ rule.
 ## How to add a row
 
 The merge commit SHA doesn't exist until *after* a PR merges, so this
-can't be part of the PR it's documenting. After a PR that closes an
-issue merges:
+can't be part of the PR it's documenting. After a PR merges:
 
 1. Note the squash-merge commit SHA (`git log --oneline -1 main`, or
    `gh pr view <N> --json mergeCommit`).
-2. Add one row to the table below, in its own small `docs:` commit
-   direct to a short-lived branch → PR → merge (same process as any
-   other change — nothing here is exempt from that).
-3. Close the issue if "Closes #N" in the PR body didn't already do it.
+2. Decide which table it belongs in:
+   - **Ledger** — the PR ships work traceable to a version in
+     [roadmap.md](./roadmap.md)'s scope table, whether or not an issue
+     was filed for it.
+   - **Infra & Tooling** — everything else that isn't pure prose-only
+     doc polish: CI, scaffolding, lint config, PR/issue process,
+     `.claude/agents/*` definitions, admin passes on the planning docs
+     themselves. Kept in its own table so it doesn't dilute the
+     Ledger's signal of "what shipped to the product," while still
+     giving this real, load-bearing work a durable trace instead of
+     living only in `git log`.
+   - Neither — a PR that only edits prose within an existing doc
+     without adding new tracked capability (e.g. wording fixes,
+     re-adding a ledger row) doesn't need a row in either table. This
+     is a judgment call, not a hard rule — see the note below the
+     History tables.
+3. Add one row to the applicable table below, in its own small `docs:`
+   commit direct to a short-lived branch → PR → merge (same process as
+   any other change — nothing here is exempt from that).
+4. Close the issue if "Closes #N" in the PR body didn't already do it.
 
 ## Ledger
 
 | Version | Issue | PR | Commit | What shipped |
 |---|---|---|---|---|
 | v0.3 | #17 | #18 | `f686930` | Calibration step-sequencing engine (steps 0/1/2/4/5) + CalibrationStore; SessionStore split into idb.ts |
+
+## Infra & Tooling
+
+Process, CI, and agent-tooling work — not mapped to a roadmap version,
+so it doesn't belong in the Ledger table above, but still real,
+durable work worth being able to find later. Same append-only rule
+applies.
+
+| PR | Commit | What shipped |
+|---|---|---|
+| #19 | `7377da1` | GitHub Project tracking workflow documented in CLAUDE.md; CI hang fix |
+| #20 | `58b19a1` | `docs/ledger.md` added + docs-vs-specs authority rule in CLAUDE.md |
+| #21 | `f4dfa90` | Roadmap/backlog admin pass — labels, stale issues closed, doc cross-links |
+| #22 | `56eae32` | `wizard-scrummaster` agent added to close out `/wizard-review` |
+| #23 | `e955597` | Fixed scrummaster's tool grant and a stale step-6 doc pointer |
+| #24 | `87a3952` | `groomer`, `reviewer`, `ledger-scribe` subagent definitions added |
 
 ## History (pre-dates this file)
 
@@ -76,9 +107,20 @@ it can't back up.
 | v0.2 | — *(no issue filed)* | #12 | `87c5433` | Delete-all and export-as-JSON UI |
 | v0.2 | — *(no issue filed)* | #14 | `f17524d` | Playwright e2e coverage for the SessionStore end-to-end path |
 
-Infra/process-only PRs (#4, #5, #7, #13, #15, #16 — scaffolding, CI,
-ESLint, PR template, wizard-review, README) aren't listed here; this
-file tracks roadmap-linked work, not every merge. That line is a
-judgment call, not a hard rule — if infra work ever needs its own
-traceability, it gets its own row when that's actually needed, not
-preemptively.
+Infra/process-only PRs that predate this file, backfilled into the
+Infra & Tooling table's history the same way:
+
+| PR | Commit | What shipped |
+|---|---|---|
+| #4 | `6b672b4` | `docs/` skeleton |
+| #5 | `63bec27` | Vite + TypeScript project scaffold |
+| #7 | `c6bdce3` | ESLint + typescript-eslint + GitHub Actions CI |
+| #13 | `c75233c` | PR template with concrete test-plan guidance |
+| #15 | `f11de0e` | `/wizard-review` multi-persona PR review + test-plan merge gate |
+| #16 | `daf926b` | Project README |
+
+Not every merge gets a row in either table — PRs that only edit prose
+within an existing doc without adding new tracked capability (e.g.
+#25, which just re-added #18's Ledger row) are deliberately excluded.
+That's a judgment call, not a hard rule — see "How to add a row"
+above.
