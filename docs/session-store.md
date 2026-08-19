@@ -72,6 +72,21 @@ choice, not laziness: an instrument that stops working because of a
 storage error would be a worse failure mode than one that silently
 (but visibly-in-console) stops saving.
 
+## Delete-all and export UI
+
+Two buttons in `main.ts`, disabled while a capture is active (to avoid
+deleting or exporting mid-write):
+
+- **Delete all sessions** — gated behind a native `window.confirm()`,
+  since it's irreversible. Calls `sessionStore.deleteAll()`.
+- **Export sessions as JSON** — calls `getAllSessionsWithFrames()`,
+  serializes with `sessionsToExportJson()`, and triggers a browser
+  download via a `Blob` + object URL + a temporary `<a download>`
+  click (no server round-trip, no dependency).
+
+Both surface failures in the status text and rethrow (not swallowed),
+matching the rest of `main.ts`'s error-handling pattern.
+
 ## Known gaps
 
 - **No automated tests for the IndexedDB-touching methods.** Node has
