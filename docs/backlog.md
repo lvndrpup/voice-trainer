@@ -18,3 +18,42 @@ for what's actually scheduled.
 - Ansible + Molecule self-hosted runner
 - GitHub Actions PR review
 - Golden-file DSP fixtures
+
+## Claude Code subagents
+
+Candidate `.claude/agents/*.md` beyond the existing wizard-review
+persona set (correctness/security/simplicity/performance, reviews
+PRs). Parked here rather than filed as issues since these are dev
+tooling, not versioned product scope — pick one, and it graduates
+straight to a drafted agent file, no milestone needed.
+
+- **groomer** — turns a roadmap item into a well-formed, Ready issue
+  (acceptance criteria, size, layer, non-goals, edge cases). Already
+  drafted at `.claude/agents/groomer.md`, not yet committed.
+- **reviewer** — reviews a diff against its issue's acceptance
+  criteria and CLAUDE.md's non-negotiables. Already drafted at
+  `.claude/agents/reviewer.md`, not yet committed.
+- **ledger-scribe** — appends the correct `docs/ledger.md` row after a
+  PR merges, per that file's own "How to add a row" process (currently
+  a manual step). Project-specific, not pulled from an external
+  pattern.
+- **debugger** — reproduces and root-causes a *live* failure (a flaky
+  Playwright run, a spectrogram artifact), distinct from `reviewer`'s
+  diff-vs-criteria job.
+- **docs-auditor** — sweeps the whole `docs/` tree for Diátaxis
+  mode-mixing, ADR-immutability violations, dead relative links, and
+  stale Mermaid diagrams — `reviewer` only checks docs touched in the
+  diff at hand, not the corpus.
+- **accessibility-tester** — canvas-only UI: keyboard access to
+  start/stop, screen-reader labeling, colorblind-safe grayscale
+  (already flagged as a "revisit" in [spectrogram.md](./spectrogram.md)).
+  Nothing currently covers this axis.
+- **dsp-numerics-auditor** — checks a new DSP estimator against
+  synthetic/analytic ground truth before ship, ahead of issue #17's
+  upcoming LPC/corner-vowel work. Narrower than wizard-correctness's
+  general bug hunt.
+- *(weaker, optional)* **dependency-gatekeeper** — flags new
+  `package.json` deps/bundle size against CLAUDE.md's "ask before
+  adding dependencies, no framework" rule. Partial overlap with
+  wizard-simplicity; only worth it if that overlap turns out to
+  matter in practice.
