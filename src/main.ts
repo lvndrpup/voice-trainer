@@ -12,6 +12,7 @@ import {
 } from "./audio";
 import { computeLogFrequencyBins, detectPitch } from "./dsp";
 import { SpectrogramRenderer } from "./render";
+import { SessionStore } from "./store";
 
 // T is set by the caller's explicit type argument (mirrors DOM's own
 // querySelector<T>), not inferred from the selector string.
@@ -32,7 +33,15 @@ const canvas = requireElement<HTMLCanvasElement>("#spectrogram");
 
 const capture = new MicrophoneCapture();
 const spectrogram = new SpectrogramRenderer(canvas);
+const sessionStore = new SessionStore();
+
+// Feature-frame logging rate, not the ~60Hz tick() rate — see
+// docs/session-store.md.
+const FRAME_LOG_INTERVAL_MS = 100;
+
 let rafHandle: number | null = null;
+let currentSessionId: string | null = null;
+let lastFrameLoggedAt = 0;
 
 function peakDb(spectrum: Float32Array): number {
   let peak = -Infinity;
@@ -45,17 +54,32 @@ function peakDb(spectrum: Float32Array): number {
 function tick(): void {
   const spectrum = capture.getSpectrum();
   const info = capture.info;
+  const peak = peakDb(spectrum);
+  let f0: number | null = null;
+
   if (info) {
     const logBins = computeLogFrequencyBins(spectrum, info.sampleRate, canvas.height);
     spectrogram.pushColumn(logBins);
 
     const waveform = capture.getWaveform();
-    const f0 = detectPitch(waveform, info.sampleRate);
+    f0 = detectPitch(waveform, info.sampleRate);
     f0El.textContent = f0 !== null ? f0.toFixed(1) : "—";
   }
 
-  const peak = peakDb(spectrum);
   peakEl.textContent = Number.isFinite(peak) ? peak.toFixed(1) : "—";
+
+  if (currentSessionId && info) {
+    const now = performance.now();
+    if (now - lastFrameLoggedAt >= FRAME_LOG_INTERVAL_MS) {
+      lastFrameLoggedAt = now;
+      void sessionStore.appendFrame(currentSessionId, {
+        timestamp: Date.now(),
+        f0Hz: f0,
+        peakDb: peak,
+      });
+    }
+  }
+
   rafHandle = requestAnimationFrame(tick);
 }
 
@@ -83,8 +107,23 @@ async function handleStart(): Promise<void> {
   statusEl.textContent = "Requesting microphone…";
   try {
     const info = await capture.start();
-    statusEl.textContent = `Capturing (device ${info.deviceId ?? "unknown"})`;
+    let statusText = `Capturing (device ${info.deviceId ?? "unknown"})`;
+
+    // Persistence failures degrade gracefully rather than blocking the
+    // instrument — a broken IndexedDB shouldn't stop you from seeing
+    // your own spectrogram. The failure is still surfaced, not swallowed.
+    try {
+      const session = await sessionStore.startSession(info.deviceId);
+      currentSessionId = session.id;
+    } catch (err) {
+      console.error("Failed to start a session; capture will continue without saving.", err);
+      currentSessionId = null;
+      statusText += " — not saving (storage unavailable)";
+    }
+
+    statusEl.textContent = statusText;
     button.textContent = "Stop capture";
+    lastFrameLoggedAt = 0;
     tick();
   } catch (err) {
     statusEl.textContent = describeError(err);
@@ -99,6 +138,16 @@ async function handleStop(): Promise<void> {
     cancelAnimationFrame(rafHandle);
     rafHandle = null;
   }
+
+  if (currentSessionId) {
+    try {
+      await sessionStore.endSession(currentSessionId);
+    } catch (err) {
+      console.error("Failed to close the session record.", err);
+    }
+    currentSessionId = null;
+  }
+
   await capture.stop();
   peakEl.textContent = "—";
   f0El.textContent = "—";
