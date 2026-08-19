@@ -145,6 +145,71 @@ export function detectPitch(
   return sampleRate / refinedLag;
 }
 
+/**
+ * Robust central tendency for calibration aggregation — median rather
+ * than mean, since one stray click/pop shifts a mean but not a median.
+ * Non-finite inputs (e.g. the `-Infinity` a silent-frame `peakDb`
+ * reading can legitimately be — see decisions.md's "Open" entry on
+ * `FeatureFrame.peakDb`) are filtered out rather than left to corrupt
+ * the result. Returns null, not NaN, when nothing finite remains —
+ * "never a misleading number," same convention as detectPitch.
+ */
+export function medianOfFinite(values: readonly number[]): number | null {
+  const finite = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (finite.length === 0) {
+    return null;
+  }
+  const mid = Math.floor(finite.length / 2);
+  return finite.length % 2 === 0 ? (finite[mid - 1] + finite[mid]) / 2 : finite[mid];
+}
+
+/**
+ * Median of the non-null pitch readings collected during calibration's
+ * "count to five" step (calibration.md step 2) — "the most important
+ * single number" calibration produces, per that doc. Kept as its own
+ * function rather than a bare `medianOfFinite` call at the call site
+ * because it also has to strip the nulls that mean "no confident pitch
+ * this frame" before aggregating.
+ */
+export function estimateHabitualF0Hz(f0Samples: readonly (number | null)[]): number | null {
+  const voiced = f0Samples.filter((f0): f0 is number => f0 !== null);
+  return medianOfFinite(voiced);
+}
+
+/**
+ * Comfortable F0 range from calibration.md steps 4 ("hiii like greeting
+ * a dog" — top of comfortable range, in greeting register) and 5 (a
+ * hum slide up then down, stopping "wherever it stops feeling easy").
+ * Floor is the hum slide's own low end; ceiling is the higher of the
+ * greeting-register top and the hum slide's own top, since either task
+ * might turn out to reach higher on a given day.
+ *
+ * [likely] — calibration.md documents what each step produces
+ * individually, not a formula for combining them into one range; this
+ * is a reading of the two step descriptions, not a specified formula.
+ * See decisions.md.
+ */
+export function estimateComfortableF0Range(
+  greetingF0Samples: readonly (number | null)[],
+  humSlideF0Samples: readonly (number | null)[],
+): [number, number] | null {
+  const humVoiced = humSlideF0Samples.filter((f0): f0 is number => f0 !== null);
+  if (humVoiced.length === 0) {
+    return null; // the hum slide anchors the floor; no range without it
+  }
+
+  let floorHz = Infinity;
+  let ceilingHz = -Infinity;
+  for (const f0 of humVoiced) {
+    if (f0 < floorHz) floorHz = f0;
+    if (f0 > ceilingHz) ceilingHz = f0;
+  }
+  for (const f0 of greetingF0Samples) {
+    if (f0 !== null && f0 > ceilingHz) ceilingHz = f0;
+  }
+  return [floorHz, ceilingHz];
+}
+
 function normalizedCorrelationAtLag(samples: Float32Array, lag: number): number {
   let correlation = 0;
   let localEnergy = 0;

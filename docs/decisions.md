@@ -104,6 +104,44 @@ for now," not "settled forever."
   `no-restricted-imports` rules in `eslint.config.mjs`, scoped to only
   the restrictions CLAUDE.md actually states — `src/store` has no
   stated import restriction, so none is enforced for it.
+- v0.3's first PR adds a fourth pure module, `src/calibration/` — the
+  step-sequencing/validity engine for the 6-step calibration protocol.
+  Same testability charter as `src/dsp` (headless, no DOM/Web Audio/
+  Canvas) but for a multi-step state machine rather than stateless
+  signal processing, so it's its own module rather than folded into
+  `dsp`. May import `dsp`; may not import `audio`/`render`/`store`
+  (enforced the same way as the existing boundaries). One deliberate
+  exception to the "calibration touches nothing else" rule:
+  `src/store/calibration.ts` imports the `ValidityReport` type *from*
+  `src/calibration`, since that module is what actually produces one —
+  allowed because `src/store` has no import restriction of its own.
+  See [ADR 0004](./adr/0004-calibration-module-boundary.md) and
+  [calibration-store.md](./calibration-store.md).
+- `src/store/index.ts`'s `openDatabase()`/`requestToPromise()`/
+  `getRecord()`/`getAllRecords()` helpers moved to `src/store/idb.ts`
+  once `CalibrationStore` needed the same open()/request-wrapping
+  logic against the same physical `resonance-scope` database.
+  `SessionStore`'s public behavior is unchanged. `idb.ts` is also now
+  the one place that knows every object store name across the app,
+  since IndexedDB requires all of one version's schema changes to
+  happen inside a single `onupgradeneeded` callback — `DATABASE_VERSION`
+  bumped 1 → 2 to add the `calibrations` store, additively (existing
+  `sessions`/`frames` data untouched).
+- `Calibration` (`src/store/calibration.ts`) deviates from
+  calibration.md's documented interface in two small ways: `deviceId`
+  is `string | null` rather than `string`, matching what
+  `MicrophoneCaptureInfo.deviceId` (`src/audio`) can actually provide
+  rather than inventing a placeholder; and an `id: string` primary key
+  was added, since IndexedDB needs a `keyPath` and the documented
+  interface didn't specify one. See
+  [calibration-store.md](./calibration-store.md).
+- Calibration's wizard UI (`index.html`/`main.ts` wiring) is
+  deliberately not part of v0.3's first PR — see calibration.md's
+  6 steps, of which only 0/1/2/4/5 have a producer so far (step 3
+  needs LPC formants, a separate PR). CLAUDE.md: "No half-finished
+  implementations either" — a wizard button a user could open but
+  never complete would be exactly that, so the whole wizard ships in
+  one PR once step 3 exists, atomically.
 
 ## Decided — process
 
@@ -166,6 +204,14 @@ for now," not "settled forever."
 
 ## Open
 
+- How `dsp.estimateComfortableF0Range` combines calibration.md's steps
+  4 (greeting-register top) and 5 (hum slide) into one range isn't
+  specified by that doc — only what each step individually produces.
+  Current implementation: floor = the hum slide's own low end,
+  ceiling = the higher of the greeting-register top and the hum
+  slide's own top. [likely] — a reasonable reading of the two step
+  descriptions, not a specified formula; revisit if it produces
+  obviously-wrong ranges once there's real calibration data to look at.
 - `FeatureFrame.peakDb` can legitimately be `-Infinity` (a silent
   frame — `peakDb()` in `main.ts` starts there and only rises if a
   spectrum bin has energy), but `sessionsToExportJson()` uses

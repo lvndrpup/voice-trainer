@@ -94,4 +94,19 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ["src/calibration/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["**/audio", "**/audio/*"], message: boundaryMessage("calibration", "audio") },
+            { group: ["**/render", "**/render/*"], message: boundaryMessage("calibration", "render") },
+            { group: ["**/store", "**/store/*"], message: boundaryMessage("calibration", "store") },
+          ],
+        },
+      ],
+    },
+  },
 );

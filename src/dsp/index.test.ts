@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeLogFrequencyBins, detectPitch } from "./index.ts";
+import {
+  computeLogFrequencyBins,
+  detectPitch,
+  medianOfFinite,
+  estimateHabitualF0Hz,
+  estimateComfortableF0Range,
+} from "./index.ts";
 
 function sineWave(frequencyHz: number, sampleRate: number, length: number): Float32Array {
   const samples = new Float32Array(length);
@@ -116,4 +122,50 @@ void test("detectPitch: rejects invalid options", () => {
 
 void test("detectPitch: rejects a too-short sample array", () => {
   assert.throws(() => detectPitch(new Float32Array(1), 48000));
+});
+
+void test("medianOfFinite: odd-length input returns the middle value", () => {
+  assert.equal(medianOfFinite([3, 1, 2]), 2);
+});
+
+void test("medianOfFinite: even-length input averages the two middle values", () => {
+  assert.equal(medianOfFinite([1, 2, 3, 4]), 2.5);
+});
+
+void test("medianOfFinite: filters out non-finite values, including -Infinity", () => {
+  assert.equal(medianOfFinite([-Infinity, 1, 2, 3, Infinity, NaN]), 2);
+});
+
+void test("medianOfFinite: returns null when nothing finite remains", () => {
+  assert.equal(medianOfFinite([]), null);
+  assert.equal(medianOfFinite([-Infinity, NaN]), null);
+});
+
+void test("medianOfFinite: one stray outlier doesn't move the median the way it would a mean", () => {
+  const withOutlier = medianOfFinite([100, 101, 102, 5000]);
+  assert.equal(withOutlier, 101.5);
+});
+
+void test("estimateHabitualF0Hz: medians the voiced (non-null) readings", () => {
+  assert.equal(estimateHabitualF0Hz([110, null, 112, null, 108]), 110);
+});
+
+void test("estimateHabitualF0Hz: returns null when every reading is unvoiced", () => {
+  assert.equal(estimateHabitualF0Hz([null, null, null]), null);
+});
+
+void test("estimateComfortableF0Range: floor from the hum slide, ceiling is the higher of both steps", () => {
+  const greeting = [300, 310, 305];
+  const humSlide = [150, 200, 320, 180];
+  assert.deepEqual(estimateComfortableF0Range(greeting, humSlide), [150, 320]);
+});
+
+void test("estimateComfortableF0Range: greeting step never lowers the ceiling below the hum slide's own top", () => {
+  const greeting = [200, null, 210];
+  const humSlide = [150, 400, 180];
+  assert.deepEqual(estimateComfortableF0Range(greeting, humSlide), [150, 400]);
+});
+
+void test("estimateComfortableF0Range: returns null when the hum slide has no voiced readings", () => {
+  assert.equal(estimateComfortableF0Range([300, 310], [null, null]), null);
 });
