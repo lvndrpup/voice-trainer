@@ -62,6 +62,14 @@ for now," not "settled forever."
 - Store extracted features, not raw audio. Raw retention is opt-in per
   session. A device compromise should leak numbers, not recordings of
   someone's voice.
+- Session persistence (v0.2) uses two IndexedDB object stores —
+  `sessions` and `frames`, the latter indexed by `sessionId` — rather
+  than nesting a frames array inside each session record, so appending
+  a frame is O(1) instead of a read-modify-write of a growing array.
+  Feature-frame logging is throttled to ~10Hz by the caller, not the
+  ~60Hz animation-frame rate the instrument display runs at. See
+  [ADR 0003](./adr/0003-session-persistence-schema.md) and
+  [session-store.md](./session-store.md).
 - getUserMedia must disable echoCancellation, noiseSuppression, and
   autoGainControl. AGC alone invalidates every intensity and spectral-
   tilt measure.
