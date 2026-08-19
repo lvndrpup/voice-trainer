@@ -10,7 +10,8 @@ runs client-side: audio never leaves the browser.
 ## Contents
 
 - [Roadmap](./roadmap.md) — versions and scope, effort-sized not date-sized
-- [Decisions](./decisions.md) — running decision ledger
+- [Decisions](./decisions.md) — running log of *why*, revisable, not ground truth for current state
+- [Ledger](./ledger.md) — append-only record of what actually shipped, per issue/PR/commit
 - [Calibration](./calibration.md) — the 6-step calibration protocol
 - [Strain](./strain.md) — the StrainEstimator interface and risk tiers
 - [Backlog](./backlog.md) — parked ideas

@@ -42,6 +42,16 @@ docs/documentation-standards.md. Summary:
   a claim is unsourced, tag it [likely] or [speculative] in the doc.
 - Relative Markdown links only. No [[wikilinks]] — GitHub won't
   render them.
+- Docs vs. specs. Reference docs (audio-capture.md, spectrogram.md,
+  pitch-detection.md, session-store.md, testing.md, ADRs — anything
+  written/updated in the same commit as the code it describes) plus
+  the code itself and [docs/ledger.md](docs/ledger.md) are the only
+  ground truth for what's actually shipped. roadmap.md, decisions.md,
+  and backlog.md describe intent, not state — they can be
+  aspirational, superseded, or already wrong (decisions.md says so
+  about itself). Read them for direction and context; before treating
+  anything in them as true of the app as it exists right now, verify
+  against code, a reference doc, or ledger.md.
 
 ## Git
 - Conventional Commits for commit messages and PR titles.
