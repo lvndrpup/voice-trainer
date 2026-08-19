@@ -52,6 +52,11 @@ starts. This is the same category as `fftSize` or `minDecibels`: an
 implementation parameter, not one of the frequency/formant targets
 CLAUDE.md forbids hardcoding.
 
+The axis currently runs 20Hz to Nyquist — there is no upper cap. A
+60Hz-8kHz range was specified for this display during GitHub issue #2's
+grooming and was never reconciled with the shipped default; see
+[decisions.md](./decisions.md#open) for the open question.
+
 Throws on: fewer than 2 input bins, a non-positive-integer
 `outputBinCount`, or a `minFrequencyHz` outside `(0, nyquist)`. Tested
 with synthetic inputs in `src/dsp/index.test.ts` (constant-input,
