@@ -85,4 +85,9 @@ This posts regardless of posting mode — it's the one comment that always lands
 
 ## 6. Report back
 
-Tell the user: the PR link, a one-line tally (e.g. "2 CONFIRMED, 3 PLAUSIBLE across 3 wizards"), and point them at the PR for the full discussion. Don't re-paste all the full reports into the chat — that defeats the point of posting them.
+Tell the user: the PR link, a one-line tally (e.g. "2 CONFIRMED, 3 PLAUSIBLE across 3 wizards"), and where to look next — this depends on posting mode:
+
+- **Full discussion** — point them at the PR for the full wizard-by-wizard discussion.
+- **Summary only** — point them at the PR for the Scrum Master's comment specifically (there's no wizard-by-wizard discussion posted to send them to).
+
+Don't re-paste all the full reports into the chat — that defeats the point of posting them.
