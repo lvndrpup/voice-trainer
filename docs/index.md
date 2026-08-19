@@ -16,6 +16,7 @@ runs client-side: audio never leaves the browser.
 - [Backlog](./backlog.md) — parked ideas
 - [Documentation standards](./documentation-standards.md) — how these docs are written
 - [Audio capture](./audio-capture.md) — mic capture module: API, audio graph, state machine
+- [Spectrogram](./spectrogram.md) — log-frequency bin remapping and the scrolling canvas renderer
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record
 - [ADR 0002: Raw getUserMedia constraints (AGC off)](./adr/0002-agc-off-raw-constraints.md) — architecture decision record
 

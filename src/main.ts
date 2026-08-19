@@ -1,9 +1,6 @@
-// Entry point. Wiring to audio/dsp/render/store lands with v0.1.
-//
-// This is a throwaway manual test harness for mic capture: a start/stop
-// button and a peak-dB readout, so capture can be verified before the
-// spectrogram/render pipeline exists. Replace when src/render/ lands.
-// See docs/audio-capture.md.
+// Entry point. Wires audio capture, dsp remapping, and canvas rendering
+// together for the v0.1 instrument display. See docs/audio-capture.md
+// and docs/spectrogram.md.
 
 import {
   MicrophoneCapture,
@@ -13,6 +10,8 @@ import {
   MicrophoneConstraintsUnsupportedError,
   AudioContextSuspendedError,
 } from "./audio";
+import { computeLogFrequencyBins } from "./dsp";
+import { SpectrogramRenderer } from "./render";
 
 // T is set by the caller's explicit type argument (mirrors DOM's own
 // querySelector<T>), not inferred from the selector string.
@@ -28,8 +27,10 @@ function requireElement<T extends Element>(selector: string): T {
 const button = requireElement<HTMLButtonElement>("#mic-toggle");
 const peakEl = requireElement<HTMLSpanElement>("#peak-db");
 const statusEl = requireElement<HTMLParagraphElement>("#mic-status");
+const canvas = requireElement<HTMLCanvasElement>("#spectrogram");
 
 const capture = new MicrophoneCapture();
+const spectrogram = new SpectrogramRenderer(canvas);
 let rafHandle: number | null = null;
 
 function peakDb(spectrum: Float32Array): number {
@@ -41,7 +42,14 @@ function peakDb(spectrum: Float32Array): number {
 }
 
 function tick(): void {
-  const peak = peakDb(capture.getSpectrum());
+  const spectrum = capture.getSpectrum();
+  const info = capture.info;
+  if (info) {
+    const logBins = computeLogFrequencyBins(spectrum, info.sampleRate, canvas.height);
+    spectrogram.pushColumn(logBins);
+  }
+
+  const peak = peakDb(spectrum);
   peakEl.textContent = Number.isFinite(peak) ? peak.toFixed(1) : "—";
   rafHandle = requestAnimationFrame(tick);
 }
@@ -90,6 +98,7 @@ async function handleStop(): Promise<void> {
   peakEl.textContent = "—";
   statusEl.textContent = "Stopped";
   button.textContent = "Start capture";
+  spectrogram.clear();
 }
 
 button.addEventListener("click", () => {

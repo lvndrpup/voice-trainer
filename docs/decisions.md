@@ -115,7 +115,18 @@ for now," not "settled forever."
   deferred, and is now scheduled to land immediately before any custom
   DSP. Rationale: AnalyserNode's FFT is not code we wrote, so there was
   nothing to verify in v0.1. The oracle requirement returns the moment
-  we write our own estimators.
+  we write our own estimators. Landed alongside `computeLogFrequencyBins`
+  (the first custom DSP function) using Node's built-in `node --test`
+  runner rather than a new test-framework dependency — see
+  [spectrogram.md](./spectrogram.md#testing) for what's actually
+  covered. This is a lighter bar than a true oracle-comparison harness
+  (no external reference implementation involved yet); revisit if a
+  DSP estimator's correctness becomes hard to eyeball from synthetic
+  cases alone.
+- Log-axis bin remapping (the "first real coding problem" Open item)
+  landed as `computeLogFrequencyBins` — linear interpolation between
+  the two nearest linear FFT bins, log2-spaced across
+  `[minFrequencyHz, nyquist]`. See [spectrogram.md](./spectrogram.md).
 - Streak ban was initially blanket. Narrowed: adherence streaks are
   fine and probably good (practice frequency is the real predictor);
   performance streaks remain forbidden.
@@ -127,7 +138,6 @@ for now," not "settled forever."
 
 ## Open
 
-- Log-axis bin remapping approach (first real coding problem).
 - Whether H1-H2 survives mic-response confounds well enough to justify
   the formant-correction work.
 - Where exercise content comes from — needs a real SLP source.

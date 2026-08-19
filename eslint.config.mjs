@@ -27,6 +27,11 @@ export default tseslint.config(
       },
       globals: { ...globals.browser },
     },
+    rules: {
+      // Numbers stringify predictably (unlike objects/any) and this is a
+      // numeric-heavy DSP codebase — allow them in template expressions.
+      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+    },
   },
   {
     files: ["eslint.config.mjs"],
