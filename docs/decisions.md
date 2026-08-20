@@ -379,6 +379,20 @@ for now," not "settled forever."
 
 ## Open
 
+- `deny-bash-writes.sh` (read-only subagent enforcement, issue #41) is
+  a denylist over regex-matched command patterns. A `wizard-simplicity`
+  review of the fourth round of bypass-patching (command substitution,
+  leading whitespace, `tee`, `git` flags — see the "Decided — process"
+  entry above) raised a real architectural question: pattern-matching
+  a command string is trying to approximate a shell parser, which has
+  a structural ceiling as an approach — every fix closes a known
+  bypass, not the *class* of bypass, so a fifth one is plausible. The
+  alternative it named: an allowlist (only permit the specific `gh`/
+  `git log`/`node` invocations each agent's own instructions actually
+  call for) rather than trying to deny everything dangerous. Not
+  built here — a real redesign, not a small follow-up fix, and this
+  entry exists so it isn't lost, not because the denylist approach is
+  wrong for now. Revisit if another real bypass surfaces.
 - How `dsp.estimateComfortableF0Range` combines calibration.md's steps
   4 (greeting-register top) and 5 (hum slide) into one range isn't
   specified by that doc — only what each step individually produces.

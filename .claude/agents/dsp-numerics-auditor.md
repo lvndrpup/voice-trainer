@@ -2,6 +2,12 @@
 name: dsp-numerics-auditor
 description: Validates a DSP estimator against synthetic/analytic ground truth — pure tones, known harmonic series, silence, and pathological input.
 tools: Read, Grep, Bash
+# This hooks: block is copy-pasted identically into four agent files
+# (groomer/reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
+# subagent frontmatter has no include/anchor mechanism to de-duplicate
+# it. If you touch this block (the script path, the matcher, adding a
+# second one), touch all four — nothing enforces that they stay in
+# sync. See docs/decisions.md.
 hooks:
   PreToolUse:
     - matcher: "Bash"

@@ -2,6 +2,12 @@
 name: reviewer
 description: Reviews a diff against acceptance criteria and CLAUDE.md.
 tools: Bash, Read, Grep
+# This hooks: block is copy-pasted identically into four agent files
+# (groomer/reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
+# subagent frontmatter has no include/anchor mechanism to de-duplicate
+# it. If you touch this block (the script path, the matcher, adding a
+# second one), touch all four — nothing enforces that they stay in
+# sync. See docs/decisions.md.
 hooks:
   PreToolUse:
     - matcher: "Bash"
