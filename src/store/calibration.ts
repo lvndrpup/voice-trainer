@@ -11,11 +11,12 @@
 // import ../store (enforced by eslint.config.mjs), but src/store has
 // no stated import restriction, same as it has none on src/dsp.
 //
-// `cornerVowels` (step 3, corner-vowel formants) has no producer yet —
-// LPC-based formant extraction lands in a follow-up PR alongside
-// golden-file fixtures, per decisions.md's "Corrected" ledger entry on
-// custom DSP needing an oracle. Nothing in src/ constructs a full
-// Calibration until that lands; this module only stores/retrieves one.
+// `cornerVowels` (step 3, corner-vowel formants) now has a producer —
+// CalibrationEngine.buildDraft() (src/calibration) — but nothing in
+// src/ calls it in production yet; the wizard UI wiring (index.html/
+// main.ts) that would actually drive a full calibration attempt is a
+// separate, still-pending follow-up. This module only stores/
+// retrieves a Calibration; it doesn't construct one.
 //
 // calibration.md also asks to "store the raw feature frames from
 // calibration too, not just the summary, so old calibrations can be
@@ -36,9 +37,13 @@ import {
   CALIBRATION_FRAMES_STORE,
   CALIBRATION_FRAMES_CALIBRATION_ID_INDEX,
 } from "./idb.ts";
-import type { ValidityReport, NonFormantStepId, StepReading } from "../calibration/index.ts";
+import type { ValidityReport, StepId, StepReading, FormantStepReading } from "../calibration/index.ts";
 
-export const CALIBRATION_SCHEMA_VERSION = 1;
+// 2: CalibrationStepFrame gained `formants` (corner-vowel steps) and
+// `stepId` widened from NonFormantStepId to StepId — additive, existing
+// records (schemaVersion 1) remain readable, they just predate corner-
+// vowel frames entirely.
+export const CALIBRATION_SCHEMA_VERSION = 2;
 
 export interface Formants {
   f1Hz: number;
@@ -64,7 +69,8 @@ export interface Calibration {
   levelReferenceDb: number | null;
   habitualF0Hz: number | null;
   comfortableF0Range: [number, number] | null;
-  /** Null until formant extraction lands — see the module header. */
+  /** Null if any of the three corner vowels never produced a confident
+   * formant reading — see CalibrationEngine.buildDraft(). */
   cornerVowels: CornerVowelFormants | null;
   validity: ValidityReport;
 }
@@ -77,9 +83,12 @@ export interface Calibration {
 export interface CalibrationStepFrame {
   schemaVersion: number;
   calibrationId: string;
-  stepId: NonFormantStepId;
+  stepId: StepId;
   levelDb: number;
+  /** Populated for steps 0/1/2/4/5, null for corner-vowel steps. */
   f0Hz: number | null;
+  /** Populated for corner-i/corner-a/corner-u, null otherwise. */
+  formants: Formants | null;
 }
 
 export class CalibrationStore {
@@ -88,7 +97,7 @@ export class CalibrationStore {
    * see the module header for why this store persists them at all. */
   async saveCalibration(
     data: Omit<Calibration, "schemaVersion" | "id" | "timestamp">,
-    rawReadingsByStep: ReadonlyMap<NonFormantStepId, readonly StepReading[]>,
+    rawReadingsByStep: ReadonlyMap<StepId, readonly (StepReading | FormantStepReading)[]>,
   ): Promise<Calibration> {
     const calibration: Calibration = {
       ...data,
@@ -104,12 +113,16 @@ export class CalibrationStore {
     const framesStore = tx.objectStore(CALIBRATION_FRAMES_STORE);
     for (const [stepId, readings] of rawReadingsByStep) {
       for (const reading of readings) {
+        // StepReading and FormantStepReading don't share a tag field,
+        // so the readings' own shape (via "in") is the discriminant —
+        // same pairing CalibrationEngine itself relies on internally.
         const frame: CalibrationStepFrame = {
           schemaVersion: CALIBRATION_SCHEMA_VERSION,
           calibrationId: calibration.id,
           stepId,
           levelDb: reading.levelDb,
-          f0Hz: reading.f0Hz,
+          f0Hz: "f0Hz" in reading ? reading.f0Hz : null,
+          formants: "formants" in reading ? reading.formants : null,
         };
         writes.push(requestToPromise(framesStore.add(frame)));
       }

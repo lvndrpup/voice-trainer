@@ -163,6 +163,34 @@ for now," not "settled forever."
   implementations either" — a wizard button a user could open but
   never complete would be exactly that, so the whole wizard ships in
   one PR once step 3 exists, atomically.
+- Step 3 (corner-vowel formants) now has a producer too:
+  `CalibrationEngine` (`src/calibration/index.ts`) gained three
+  engine steps, `corner-i`/`corner-a`/`corner-u`, one per vowel rather
+  than one step with a three-item reading list — chosen so each vowel
+  redoes independently (a bad `/i/` shouldn't force redoing `/a/` and
+  `/u/`), and because `STEP_PROMPTS`/`STEP_ORDER` was already
+  one-prompt-per-id, so this fits that shape without inventing a
+  sub-phase concept. `NonFormantStepId` (0|1|2|4|5) keeps its name —
+  still accurate, those five steps still don't use formants — but a
+  new `StepId = NonFormantStepId | CornerVowelStepId` union now
+  covers the full 8-engine-step space; `STEP_PROMPTS`, `STEP_ORDER`,
+  `beginStep`/`redoStep`, and (as anticipated) `src/store/
+  calibration.ts`'s `CalibrationStepFrame.stepId` all widened to it.
+  `CalibrationStepFrame` also gained a `formants` field alongside the
+  existing `f0Hz` (each null when not applicable to that step) —
+  `CALIBRATION_SCHEMA_VERSION` bumped 1 → 2, additive, existing
+  records unaffected. The corner-vowel validity check reuses step 2's
+  voiced-ratio shape (did most readings produce *a* formant) rather
+  than checking the resulting F1/F2 values against any expected
+  per-vowel range — the latter would be a hardcoded formant target,
+  which CLAUDE.md forbids outright; `estimateFormants` already bounds
+  its own output to a broad plausible range and returns `null` rather
+  than an implausible value, so that's where "formants outside
+  physiological bounds" (calibration.md's validity-check list) is
+  actually enforced. `beginStep()` still doesn't enforce step order —
+  confirmed unchanged, not an accidental side effect of adding three
+  more valid step ids. Wizard UI wiring remains deferred, per the
+  entry above — this PR is the data-layer half only.
 
 ## Decided — process
 

@@ -2,26 +2,46 @@
 // protocol (docs/calibration.md). No DOM, no Web Audio, no Canvas —
 // runs headlessly in Node, same charter as src/dsp. See CLAUDE.md.
 //
-// Registers steps 0, 1, 2, 4, and 5 only. Step 3 (corner-vowel
-// formants) needs LPC-based formant extraction that doesn't exist yet
-// and, per decisions.md's "Corrected" ledger entry on custom DSP
-// needing an oracle, needs its own golden-file fixtures before it can
-// land — a follow-up PR adds it and completes the sequence. This
-// module never claims a calibration is complete on its own; callers
-// check isComplete() before trusting buildDraft().
+// Registers all 6 protocol steps. Step 3 (corner-vowel formants) is
+// implemented as three sequential engine steps — corner-i/corner-a/
+// corner-u — one per vowel, each independently redo-able, rather than
+// one step covering all three; see docs/calibration.md's
+// implementation note. Uses estimateFormants (src/dsp) via the
+// FormantStepReading the caller submits, the same way steps 0/1/2/4/5
+// already receive pre-computed levelDb/f0Hz rather than raw audio —
+// this module aggregates and validates, it doesn't run DSP on raw
+// samples itself.
 //
-// May import from ../dsp (reusing its aggregation functions). Must
-// not import ../audio, ../render, or ../store — enforced by
-// eslint.config.mjs. Persistence (turning a CalibrationDraft into a
-// stored Calibration, once step 3 exists) is a caller's job, not
+// May import from ../dsp (reusing its aggregation functions and the
+// Formants type). Must not import ../audio, ../render, or ../store —
+// enforced by eslint.config.mjs. Persistence (turning a
+// CalibrationDraft into a stored Calibration) is a caller's job, not
 // this module's.
 
-import { medianOfFinite, estimateHabitualF0Hz, estimateComfortableF0Range } from "../dsp/index.ts";
+import {
+  medianOfFinite,
+  estimateHabitualF0Hz,
+  estimateComfortableF0Range,
+  type Formants,
+} from "../dsp/index.ts";
 
 export type NonFormantStepId = 0 | 1 | 2 | 4 | 5;
+export type CornerVowel = "i" | "a" | "u";
+export type CornerVowelStepId = `corner-${CornerVowel}`;
+export type StepId = NonFormantStepId | CornerVowelStepId;
+
+const CORNER_VOWEL_STEP_IDS: readonly CornerVowelStepId[] = ["corner-i", "corner-a", "corner-u"];
+
+function isCornerVowelStepId(id: StepId): id is CornerVowelStepId {
+  return (CORNER_VOWEL_STEP_IDS as readonly StepId[]).includes(id);
+}
+
+function cornerVowelOf(id: CornerVowelStepId): CornerVowel {
+  return id.slice("corner-".length) as CornerVowel;
+}
 
 export interface StepPrompt {
-  id: NonFormantStepId;
+  id: StepId;
   /** Shown to the user verbatim — calibration.md's "don't say
    * 'calibrating', say what it's for" applies to this copy. */
   prompt: string;
@@ -30,30 +50,47 @@ export interface StepPrompt {
 
 /** The canonical step list — order and membership. STEP_ORDER is
  * derived from this rather than hand-duplicated, so the two can't
- * drift out of sync with each other. */
+ * drift out of sync with each other. The corner-vowel prompts sit
+ * between steps 2 and 4, matching calibration.md's protocol table. */
 export const STEP_PROMPTS: readonly StepPrompt[] = [
   { id: 0, prompt: "Stay quiet a moment while I listen to your room", durationMs: 3000 },
   { id: 1, prompt: "Say ahh, like at the doctor", durationMs: 5000 },
   { id: 2, prompt: "Count to five like you're reading out a phone number", durationMs: 5000 },
+  { id: "corner-i", prompt: "Say eee, like in \"see\"", durationMs: 2000 },
+  { id: "corner-a", prompt: "Say ahh, quick this time", durationMs: 2000 },
+  { id: "corner-u", prompt: "Say ooo, like you're impressed", durationMs: 2000 },
   { id: 4, prompt: "Say hiii like you're greeting a dog", durationMs: 2000 },
   { id: 5, prompt: "Hum a slide up, then down — stop wherever it stops feeling easy", durationMs: 8000 },
 ];
 
-export const STEP_ORDER: readonly NonFormantStepId[] = STEP_PROMPTS.map((p) => p.id);
+export const STEP_ORDER: readonly StepId[] = STEP_PROMPTS.map((p) => p.id);
 
-/** One tick's worth of already-computed features — the same shape
- * main.ts's tick() loop already produces for session logging (peak dB,
- * detected F0 or null). Collecting these is the caller's job; this
- * module only aggregates and validates. */
+/** One tick's worth of already-computed features for steps 0/1/2/4/5 —
+ * the same shape main.ts's tick() loop already produces for session
+ * logging (peak dB, detected F0 or null). Collecting these is the
+ * caller's job; this module only aggregates and validates. Unchanged
+ * by the addition of corner-vowel steps — see FormantStepReading for
+ * their parallel, separate shape. */
 export interface StepReading {
   levelDb: number;
   f0Hz: number | null;
 }
 
+/** One tick's worth of already-computed features for a corner-vowel
+ * step (corner-i/corner-a/corner-u) — mirrors StepReading's role, but
+ * carries a formant estimate (src/dsp's estimateFormants output)
+ * instead of an F0 reading. A separate type rather than widening
+ * StepReading, so the existing five steps' reading shape doesn't
+ * change. */
+export interface FormantStepReading {
+  levelDb: number;
+  formants: Formants | null;
+}
+
 export interface ValidityCheck {
   id: string;
   /** Which step a failure should offer a one-tap redo for. */
-  stepId: NonFormantStepId;
+  stepId: StepId;
   passed: boolean;
   /** Human-readable, per calibration.md's "must say what went wrong". */
   message: string;
@@ -67,16 +104,26 @@ export interface ValidityReport {
   valid: boolean;
 }
 
+/** Mirrors src/store/calibration.ts's CornerVowelFormants — declared
+ * separately rather than imported, since src/calibration may not
+ * import ../store (same one-way-boundary precedent as src/dsp's own
+ * Formants vs. store's copy, see decisions.md). */
+export interface CornerVowelFormants {
+  i: Formants;
+  a: Formants;
+  u: Formants;
+}
+
 /** Everything this module can produce on its own — a Calibration
- * (src/store/calibration.ts) minus the fields step 3 owns
- * (`cornerVowels`) and the fields the store stamps at save time
- * (`schemaVersion`, `id`, `timestamp`). */
+ * (src/store/calibration.ts) minus the fields the store stamps at
+ * save time (`schemaVersion`, `id`, `timestamp`). */
 export interface CalibrationDraft {
   deviceId: string | null;
   noiseFloorDb: number | null;
   levelReferenceDb: number | null;
   habitualF0Hz: number | null;
   comfortableF0Range: [number, number] | null;
+  cornerVowels: CornerVowelFormants | null;
   validity: ValidityReport;
 }
 
@@ -106,13 +153,49 @@ function stdevOfFinite(values: readonly number[]): number | null {
   return Math.sqrt(variance);
 }
 
+/**
+ * Corner-vowel validity check: at least MIN_VOICED_RATIO of the
+ * step's readings produced a formant estimate — the same "did we get
+ * a usable signal" shape as step 2's voiced-ratio check, reusing the
+ * same threshold. Deliberately does NOT check the resulting F1/F2
+ * *values* against any expected per-vowel range: CLAUDE.md forbids
+ * hardcoded frequency/formant targets in src/ outright, and
+ * estimateFormants already bounds its own output to a broad
+ * physiologically-plausible range (minFormantHz/maxFormantHz) before
+ * this check ever sees it — an out-of-range or unresolved formant
+ * already shows up as `null`, not as a value this check would need to
+ * separately reject. This is calibration.md's "formants outside
+ * physiological bounds" check, implemented at the DSP layer rather
+ * than duplicated here with vowel-specific numbers.
+ */
+function computeCornerVowelValidity(
+  stepId: CornerVowelStepId,
+  readings: readonly FormantStepReading[],
+): ValidityCheck {
+  const voicedCount = readings.filter((r) => r.formants !== null).length;
+  const ratio = readings.length === 0 ? 0 : voicedCount / readings.length;
+  const passed = ratio >= MIN_VOICED_RATIO;
+  return {
+    id: `corner-vowel-${cornerVowelOf(stepId)}`,
+    stepId,
+    passed,
+    message: passed
+      ? "Got a clear formant reading."
+      : "Couldn't get a clear formant reading — try that vowel again, a little clearer, and redo this step.",
+  };
+}
+
 function computeStepValidity(
-  stepId: NonFormantStepId,
-  readings: readonly StepReading[],
+  stepId: StepId,
+  readings: readonly (StepReading | FormantStepReading)[],
 ): ValidityCheck | null {
+  if (isCornerVowelStepId(stepId)) {
+    return computeCornerVowelValidity(stepId, readings as readonly FormantStepReading[]);
+  }
+  const pitchReadings = readings as readonly StepReading[];
   switch (stepId) {
     case 0: {
-      const noiseFloorDb = medianOfFinite(readings.map((r) => r.levelDb));
+      const noiseFloorDb = medianOfFinite(pitchReadings.map((r) => r.levelDb));
       const passed = noiseFloorDb !== null && noiseFloorDb <= NOISE_FLOOR_MAX_DB;
       return {
         id: "noise-floor",
@@ -127,7 +210,7 @@ function computeStepValidity(
       };
     }
     case 1: {
-      const voicedF0 = readings.map((r) => r.f0Hz).filter((f0): f0 is number => f0 !== null);
+      const voicedF0 = pitchReadings.map((r) => r.f0Hz).filter((f0): f0 is number => f0 !== null);
       const stdevHz = stdevOfFinite(voicedF0);
       const passed = stdevHz !== null && stdevHz <= MAX_F0_STDEV_HZ;
       return {
@@ -143,8 +226,8 @@ function computeStepValidity(
       };
     }
     case 2: {
-      const voicedCount = readings.filter((r) => r.f0Hz !== null).length;
-      const ratio = readings.length === 0 ? 0 : voicedCount / readings.length;
+      const voicedCount = pitchReadings.filter((r) => r.f0Hz !== null).length;
+      const ratio = pitchReadings.length === 0 ? 0 : voicedCount / pitchReadings.length;
       const passed = ratio >= MIN_VOICED_RATIO;
       return {
         id: "voiced-ratio",
@@ -160,23 +243,38 @@ function computeStepValidity(
   }
 }
 
+/** Medians each of a vowel's formant readings independently (same
+ * "median, not mean" robustness rationale as medianOfFinite/
+ * estimateHabitualF0Hz), producing one Formants estimate for the
+ * step. Null if no reading in the window produced formants at all. */
+function aggregateFormants(readings: readonly FormantStepReading[]): Formants | null {
+  const voiced = readings.map((r) => r.formants).filter((f): f is Formants => f !== null);
+  const f1Hz = medianOfFinite(voiced.map((f) => f.f1Hz));
+  const f2Hz = medianOfFinite(voiced.map((f) => f.f2Hz));
+  return f1Hz === null || f2Hz === null ? null : { f1Hz, f2Hz };
+}
+
 /**
- * Drives one run of steps 0/1/2/4/5. One instance per calibration
- * attempt — construct a fresh one for a redo-from-scratch rather than
- * reusing an instance across attempts.
+ * Drives one run of the full 6-step protocol (8 engine steps, with
+ * step 3 split into corner-i/corner-a/corner-u). One instance per
+ * calibration attempt — construct a fresh one for a redo-from-scratch
+ * rather than reusing an instance across attempts.
  */
 export class CalibrationEngine {
   readonly #deviceId: string | null;
-  readonly #readingsByStep = new Map<NonFormantStepId, readonly StepReading[]>();
-  #currentStep: NonFormantStepId | null = null;
+  readonly #readingsByStep = new Map<StepId, readonly (StepReading | FormantStepReading)[]>();
+  #currentStep: StepId | null = null;
 
   constructor(deviceId: string | null) {
     this.#deviceId = deviceId;
   }
 
   /** Marks `stepId` as in progress. The caller collects readings for
-   * the step's duration (see STEP_PROMPTS), then calls submitStep(). */
-  beginStep(stepId: NonFormantStepId): void {
+   * the step's duration (see STEP_PROMPTS), then calls submitStep().
+   * Does not enforce STEP_ORDER's sequence — any not-yet-in-progress
+   * step may begin at any time; only one step may be in progress at
+   * once. */
+  beginStep(stepId: StepId): void {
     if (!STEP_ORDER.includes(stepId)) {
       throw new CalibrationEngineError(`Unknown calibration step ${String(stepId)}.`);
     }
@@ -189,9 +287,14 @@ export class CalibrationEngine {
   }
 
   /** Finalizes the step begun by the most recent beginStep() call and
-   * returns its validity check (null for steps with no check defined).
-   * Throws if called without a matching beginStep() first. */
-  submitStep(readings: readonly StepReading[]): ValidityCheck | null {
+   * returns its validity check (null for steps with no check
+   * defined). Throws if called without a matching beginStep() first.
+   * Pass StepReading[] for steps 0/1/2/4/5, FormantStepReading[] for
+   * corner-i/corner-a/corner-u — the engine trusts the caller to pass
+   * the shape matching whichever step it just began, matching the
+   * same trust level as everything else in this internal, single-
+   * caller module. */
+  submitStep(readings: readonly StepReading[] | readonly FormantStepReading[]): ValidityCheck | null {
     if (this.#currentStep === null) {
       throw new CalibrationEngineError("submitStep() called before beginStep().");
     }
@@ -202,8 +305,10 @@ export class CalibrationEngine {
   }
 
   /** Clears a previously-submitted step so it can be re-run — one-tap
-   * redo per calibration.md's UI constraints. */
-  redoStep(stepId: NonFormantStepId): void {
+   * redo per calibration.md's UI constraints. Corner-vowel steps redo
+   * independently of each other and of the other four steps: a bad
+   * /i/ doesn't require redoing /a/ or /u/. */
+  redoStep(stepId: StepId): void {
     this.#readingsByStep.delete(stepId);
   }
 
@@ -216,7 +321,9 @@ export class CalibrationEngine {
    * "store the raw feature frames too... so old calibrations can be
    * recomputed when the formant code changes." Null if `stepId` hasn't
    * been submitted yet. */
-  getStepReadings(stepId: NonFormantStepId): readonly StepReading[] | null {
+  getStepReadings(stepId: NonFormantStepId): readonly StepReading[] | null;
+  getStepReadings(stepId: CornerVowelStepId): readonly FormantStepReading[] | null;
+  getStepReadings(stepId: StepId): readonly (StepReading | FormantStepReading)[] | null {
     return this.#readingsByStep.get(stepId) ?? null;
   }
 
@@ -227,14 +334,26 @@ export class CalibrationEngine {
       throw new CalibrationEngineError("buildDraft() called before every step was submitted.");
     }
 
-    const step0 = this.#readingsByStep.get(0) ?? [];
-    const step1 = this.#readingsByStep.get(1) ?? [];
-    const step2 = this.#readingsByStep.get(2) ?? [];
-    const step4 = this.#readingsByStep.get(4) ?? [];
-    const step5 = this.#readingsByStep.get(5) ?? [];
+    const step0 = (this.#readingsByStep.get(0) ?? []) as readonly StepReading[];
+    const step1 = (this.#readingsByStep.get(1) ?? []) as readonly StepReading[];
+    const step2 = (this.#readingsByStep.get(2) ?? []) as readonly StepReading[];
+    const step4 = (this.#readingsByStep.get(4) ?? []) as readonly StepReading[];
+    const step5 = (this.#readingsByStep.get(5) ?? []) as readonly StepReading[];
+    const cornerI = (this.#readingsByStep.get("corner-i") ?? []) as readonly FormantStepReading[];
+    const cornerA = (this.#readingsByStep.get("corner-a") ?? []) as readonly FormantStepReading[];
+    const cornerU = (this.#readingsByStep.get("corner-u") ?? []) as readonly FormantStepReading[];
 
-    const checks = [0, 1, 2]
-      .map((stepId) => computeStepValidity(stepId as NonFormantStepId, this.#readingsByStep.get(stepId as NonFormantStepId) ?? []))
+    const iFormants = aggregateFormants(cornerI);
+    const aFormants = aggregateFormants(cornerA);
+    const uFormants = aggregateFormants(cornerU);
+    const cornerVowels: CornerVowelFormants | null =
+      iFormants !== null && aFormants !== null && uFormants !== null
+        ? { i: iFormants, a: aFormants, u: uFormants }
+        : null;
+
+    const checksToRun: readonly StepId[] = [0, 1, 2, "corner-i", "corner-a", "corner-u"];
+    const checks = checksToRun
+      .map((stepId) => computeStepValidity(stepId, this.#readingsByStep.get(stepId) ?? []))
       .filter((check): check is ValidityCheck => check !== null);
 
     return {
@@ -246,6 +365,7 @@ export class CalibrationEngine {
         step4.map((r) => r.f0Hz),
         step5.map((r) => r.f0Hz),
       ),
+      cornerVowels,
       validity: { checks, valid: checks.every((check) => check.passed) },
     };
   }
