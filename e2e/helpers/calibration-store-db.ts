@@ -12,13 +12,36 @@ export interface RawCalibrationDb {
   calibrationFrames: CalibrationStepFrame[];
 }
 
-/** Assumes the database already exists (i.e. the app has started at
- * least one session or calibration) — same assumption
- * session-store-db.ts's readDatabase() makes, same reason. */
+/** Unlike session-store-db.ts's readDatabase(), this does NOT assume
+ * the database already exists — a cancelled-before-saving wizard run
+ * (see calibration-wizard.spec.ts's cancel test) never calls the
+ * app's own openDatabase(), so in a fresh browser context these two
+ * object stores may genuinely not exist yet. Opening with no version
+ * against a nonexistent database creates one at version 1 with no
+ * stores at all, and reading a store that was never created throws
+ * synchronously inside the transaction() call, before onerror could
+ * ever fire — that surfaced as a hung page.evaluate() (a real CI
+ * failure, not a hypothetical) rather than a clean rejection. Create
+ * the stores here if missing, mirroring src/store/idb.ts's real
+ * schema, so a read against an empty, freshly-created database
+ * resolves to empty arrays instead of hanging. */
 export async function readCalibrationDatabase(page: Page): Promise<RawCalibrationDb> {
   return page.evaluate((dbName: string): Promise<RawCalibrationDb> => {
     return new Promise<RawCalibrationDb>((resolve, reject) => {
       const openRequest = indexedDB.open(dbName);
+      openRequest.onupgradeneeded = () => {
+        const db = openRequest.result;
+        if (!db.objectStoreNames.contains("calibrations")) {
+          db.createObjectStore("calibrations", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("calibrationFrames")) {
+          const frames = db.createObjectStore("calibrationFrames", {
+            keyPath: "frameId",
+            autoIncrement: true,
+          });
+          frames.createIndex("calibrationId", "calibrationId");
+        }
+      };
       openRequest.onerror = () => {
         reject(new Error(openRequest.error?.message ?? "IndexedDB open failed."));
       };
