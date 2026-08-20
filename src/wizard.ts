@@ -265,9 +265,26 @@ export function initCalibrationWizard(
       }
 
       const draft = engine.buildDraft();
+      const rawReadingsByStep = new Map<StepId, readonly (StepReading | FormantStepReading)[]>();
+      for (const stepId of STEP_ORDER) {
+        // isComplete() (which buildDraft() above already required)
+        // guarantees every step was submitted, so `readings` is never
+        // null in practice — the null check exists because
+        // getStepReadings is typed to return one, not because it's
+        // expected. The isCornerVowelStepId branch isn't just for the
+        // null check: getStepReadings' two overloads each only accept
+        // their own step-id subtype, not the general StepId union, so
+        // this narrowing is required to call it at all.
+        const readings = isCornerVowelStepId(stepId)
+          ? engine.getStepReadings(stepId)
+          : engine.getStepReadings(stepId);
+        if (readings !== null) {
+          rawReadingsByStep.set(stepId, readings);
+        }
+      }
       let saved = true;
       try {
-        await calibrationStore.saveCalibration(draft, new Map());
+        await calibrationStore.saveCalibration(draft, rawReadingsByStep);
       } catch (err) {
         console.error("Failed to save calibration.", err);
         saved = false;
