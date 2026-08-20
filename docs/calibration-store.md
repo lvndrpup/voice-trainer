@@ -124,13 +124,11 @@ the shared `src/store/idb.ts` helpers all these stores are built on.
 - No storage-quota handling, same caveat as session-store.md.
 - No migration path — `CALIBRATION_SCHEMA_VERSION` exists and is
   stamped, but nothing reads it yet.
-- The wizard (`src/wizard.ts`) currently saves every calibration with
-  an empty `rawReadingsByStep` map — `calibrationFrames` never gets
-  written to in production yet, even though `saveCalibration()` and
-  `getCalibrationFrames()` both work correctly against it (proven by
-  this store's own tests). A dependent follow-up issue wires
-  `CalibrationEngine.getStepReadings()` through for real.
+- The wizard (`src/wizard.ts`) now saves each step's raw readings
+  (built from `CalibrationEngine.getStepReadings()`) alongside the
+  summary, so `calibrationFrames` gets populated for real in
+  production, not just in this store's own tests.
 - Nothing yet actually *recomputes* a calibration from
-  `calibrationFrames` — a separate, further-out gap from the one
-  above; the data doesn't even get written yet, so recompute isn't
-  reachable regardless.
+  `calibrationFrames` — the data exists now, but nothing reads it back
+  to re-derive a `Calibration` (e.g. when the formant algorithm
+  changes). Still a real, separate gap.

@@ -27,6 +27,7 @@ import {
   STEP_PROMPTS,
   isCornerVowelStepId,
   type StepId,
+  type CornerVowelStepId,
   type StepReading,
   type FormantStepReading,
   type ValidityCheck,
@@ -265,9 +266,34 @@ export function initCalibrationWizard(
       }
 
       const draft = engine.buildDraft();
+      const rawReadingsByStep = new Map<StepId, readonly (StepReading | FormantStepReading)[]>();
+      for (const stepId of STEP_ORDER) {
+        // getStepReadings' two public overloads each only accept
+        // their own step-id subtype (NonFormantStepId /
+        // CornerVowelStepId), not the general StepId union — casting
+        // the argument to satisfy one overload, then the result back
+        // to the general return shape, is the honest way to call it
+        // against StepId. Simpler than branching on
+        // isCornerVowelStepId to pick an overload, since both arms
+        // would call the exact same method the exact same way (a
+        // wizard-simplicity review flagged an earlier version of this
+        // that did exactly that as looking like a copy-paste bug,
+        // since nothing about the branches actually differed).
+        //
+        // isComplete() (which buildDraft() above already required)
+        // guarantees every step was submitted, so `readings` is never
+        // null in practice — the check exists because getStepReadings
+        // is typed to return one, not because it's expected.
+        const readings = engine.getStepReadings(stepId as CornerVowelStepId) as
+          | readonly (StepReading | FormantStepReading)[]
+          | null;
+        if (readings !== null) {
+          rawReadingsByStep.set(stepId, readings);
+        }
+      }
       let saved = true;
       try {
-        await calibrationStore.saveCalibration(draft, new Map());
+        await calibrationStore.saveCalibration(draft, rawReadingsByStep);
       } catch (err) {
         console.error("Failed to save calibration.", err);
         saved = false;
