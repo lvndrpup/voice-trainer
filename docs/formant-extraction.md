@@ -190,10 +190,52 @@ use case:
   from roughly 12% up to over 25%, and in one case a wrong second
   peak entirely (F2 off by ~49%). This is a known, real limitation of
   naive peak-picked LPC at high F0 relative to formant bandwidth, not
-  something this implementation does uniquely wrong — proper fixes
-  (pitch-synchronous analysis, cepstral liftering, or similar) are a
-  different algorithm, out of scope here. Tracked as its own backlog
-  item given how directly it bears on this app's target users.
+  something this implementation does uniquely wrong.
+
+  **Investigated for issue #46**: two accessible, no-new-dependency
+  mitigations were prototyped and quantified against the same
+  synthetic corner-vowel fixtures (`/i/`, `/a/`, `/u/`) at F0 = 150,
+  220, 280, 350Hz, both at the committed tests' 0.5s window and at the
+  realistic ~43ms window `capture.getWaveform()` actually provides in
+  production (`fftSize` 2048 at 48kHz — the committed tests' 0.5s
+  window is roughly 12× longer than any window this function is
+  actually called with in `src/wizard.ts`, a mismatch tracked
+  separately as issue #68 since it's a test-fixture-realism gap, not
+  specific to the high-F0 question this investigation is about).
+
+  - **Raising `lpcOrder`** (12 → 20 at the working rates tested): does
+    **not** reliably help, and in several cases makes it much worse —
+    e.g. `/i/` at F0=280Hz: F2 error goes from 2.3% (order ~15,
+    default) to 71.6% (order 20); `/a/` at F0=350Hz: F1 goes from 4.3%
+    to 51.2%. A higher order gives the envelope more poles to spend on
+    resolving nearby harmonics as if they were real resonances — worse,
+    not better, confirming the existing "Prominence filtering" section's
+    warning above about raising the default order without
+    re-validating edge cases.
+  - **Pitch-synchronous windowing** (truncating the analysis window
+    to the largest integer number of pitch periods before Hamming
+    windowing, using the *true* F0 — the best case for this
+    technique, not even a real F0 estimate): produced results
+    statistically indistinguishable from the baseline at both window
+    lengths tested. The harmonics-to-formant bias isn't primarily a
+    windowing/spectral-leakage artifact here — Hamming windowing
+    already suppresses leakage reasonably well — it's that at high F0
+    the harmonic grid itself is too sparse near the resonance for
+    peak-picking to distinguish "harmonic" from "resonance," regardless
+    of how cleanly the window is cut.
+
+  Neither candidate is adopted. A real fix needs a genuinely different
+  approach — cepstral liftering (separating the smooth spectral
+  envelope from the periodic harmonic structure directly) is the most
+  promising documented technique, but needs an FFT this codebase
+  doesn't have yet (autocorrelation here is computed directly in the
+  time domain); complex-polynomial root-finding on the LPC denominator
+  is the other documented option, already ruled out once for the same
+  no-new-dependency reason peak-picking was chosen over it in the
+  first place (see "Peak-picking, not root-finding" above). Tracked as
+  a separate, properly-scoped backlog item — issue #67 — since
+  implementing either technique is a meaningfully sized addition, not
+  a small follow-up to this investigation.
 - **Closely-spaced formants can resolve as a single peak and return
   `null`**, not a degraded-but-present estimate — see "Prominence
   filtering" above. Concretely relevant to /u/-like vowels in the
