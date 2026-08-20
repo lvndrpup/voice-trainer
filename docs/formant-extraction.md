@@ -1,17 +1,22 @@
 # Formant extraction
 
-Reference doc for `estimateFormants` in `src/dsp/index.ts`. Not yet
-wired into calibration's step engine — that's a separate follow-up
-(the corner-vowel calibration step), tracked as its own issue,
-dependent on this one. This function exists and is tested standalone
-first.
+Reference doc for `estimateFormants` in `src/dsp/index.ts`. Consumed
+by the corner-vowel step engine (`src/calibration/index.ts`'s
+`corner-i`/`corner-a`/`corner-u` steps) — see
+[calibration.md](./calibration.md) and
+[calibration-store.md](./calibration-store.md). What's still missing
+is the production wiring: nothing in `main.ts`/`index.html` yet calls
+`estimateFormants` on real capture and feeds the result into the
+engine — that's the wizard UI, deliberately deferred (see
+[decisions.md](./decisions.md)).
 
 ## Data flow
 
 ```mermaid
 graph LR
     AN["AnalyserNode<br/>(src/audio)"] -->|getWaveform: Float32Array, time domain| DSP["estimateFormants<br/>(src/dsp)"]
-    DSP -->|"{f1Hz, f2Hz}, or null"| CAL["calibration step 3<br/>(not yet wired)"]
+    DSP -->|"{f1Hz, f2Hz}, or null"| CAL["corner-vowel steps<br/>(src/calibration)"]
+    CAL -.->|not yet wired| UI["wizard UI<br/>(main.ts, not yet built)"]
 ```
 
 Same input source as `detectPitch` — `getWaveform()`'s time-domain

@@ -21,10 +21,12 @@ runs client-side: audio never leaves the browser.
 - [Pitch detection](./pitch-detection.md) — the autocorrelation-based F0 estimator
 - [Formant extraction](./formant-extraction.md) — the LPC-based F1/F2 estimator
 - [Session store](./session-store.md) — IndexedDB schema and the SessionStore API
+- [Calibration store](./calibration-store.md) — IndexedDB schema and the CalibrationStore API
 - [Testing](./testing.md) — unit tests vs. the Playwright e2e suite, and how to run each
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record
 - [ADR 0002: Raw getUserMedia constraints (AGC off)](./adr/0002-agc-off-raw-constraints.md) — architecture decision record
 - [ADR 0003: Session persistence schema](./adr/0003-session-persistence-schema.md) — architecture decision record
+- [ADR 0004: Calibration module boundary](./adr/0004-calibration-module-boundary.md) — architecture decision record
 
 ## Layer model
 
