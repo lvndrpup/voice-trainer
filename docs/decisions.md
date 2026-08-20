@@ -190,7 +190,25 @@ for now," not "settled forever."
   actually enforced. `beginStep()` still doesn't enforce step order —
   confirmed unchanged, not an accidental side effect of adding three
   more valid step ids. Wizard UI wiring remains deferred, per the
-  entry above — this PR is the data-layer half only.
+  entry above — this PR is the data-layer half only. A
+  `wizard-correctness` review before merge caught a real bug in the
+  first version: `submitStep` accepted either reading shape for any
+  step with no check that it matched the step just begun, and because
+  `StepReading`/`FormantStepReading` don't share a field name, a
+  wrong-shaped submission didn't fail at the call site — it silently
+  reported a false-positive "clear reading," then crashed later, in
+  `buildDraft()`, somewhere that wouldn't obviously point back to the
+  actual mistake. Fixed: `submitStep` now checks each reading's shape
+  against the step's family and throws immediately on a mismatch,
+  same "surfaced not swallowed" bar the rest of this module already
+  holds to. Not reachable in production today (no caller exists yet),
+  but cheap to fix before one does. A related, lower-severity gap
+  noted but not fixed here: schemaVersion-1 `CalibrationStepFrame`
+  records genuinely lack a `formants` key at all (not `formants:
+  null`) — a future reader trusting the type as written would get
+  `undefined` from old records, not `null`. Unreachable today (no
+  reader exists), worth a guard whenever `getCalibrationFrames` gets
+  a consumer, not built speculatively now.
 
 ## Decided — process
 

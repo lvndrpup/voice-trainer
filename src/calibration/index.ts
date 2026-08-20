@@ -30,10 +30,8 @@ export type CornerVowel = "i" | "a" | "u";
 export type CornerVowelStepId = `corner-${CornerVowel}`;
 export type StepId = NonFormantStepId | CornerVowelStepId;
 
-const CORNER_VOWEL_STEP_IDS: readonly CornerVowelStepId[] = ["corner-i", "corner-a", "corner-u"];
-
 function isCornerVowelStepId(id: StepId): id is CornerVowelStepId {
-  return (CORNER_VOWEL_STEP_IDS as readonly StepId[]).includes(id);
+  return typeof id === "string";
 }
 
 function cornerVowelOf(id: CornerVowelStepId): CornerVowel {
@@ -288,17 +286,29 @@ export class CalibrationEngine {
 
   /** Finalizes the step begun by the most recent beginStep() call and
    * returns its validity check (null for steps with no check
-   * defined). Throws if called without a matching beginStep() first.
-   * Pass StepReading[] for steps 0/1/2/4/5, FormantStepReading[] for
-   * corner-i/corner-a/corner-u — the engine trusts the caller to pass
-   * the shape matching whichever step it just began, matching the
-   * same trust level as everything else in this internal, single-
-   * caller module. */
+   * defined). Throws if called without a matching beginStep() first,
+   * or if `readings`' shape doesn't match the step just begun (pass
+   * StepReading[] for steps 0/1/2/4/5, FormantStepReading[] for
+   * corner-i/corner-a/corner-u) — checked explicitly rather than
+   * trusted, since a mismatch would otherwise fail silently: the two
+   * shapes don't share a field name, so `formants !== null` on a
+   * StepReading array is `undefined !== null`, which is `true` —
+   * every reading would count as "voiced" and the mistake would only
+   * surface later, as an unrelated-looking crash in buildDraft(). */
   submitStep(readings: readonly StepReading[] | readonly FormantStepReading[]): ValidityCheck | null {
     if (this.#currentStep === null) {
       throw new CalibrationEngineError("submitStep() called before beginStep().");
     }
     const stepId = this.#currentStep;
+    const expectFormants = isCornerVowelStepId(stepId);
+    for (const reading of readings) {
+      if (("formants" in reading) !== expectFormants) {
+        throw new CalibrationEngineError(
+          `submitStep(${String(stepId)}) received ${expectFormants ? "StepReading" : "FormantStepReading"}-shaped readings; ` +
+            `this step expects ${expectFormants ? "FormantStepReading" : "StepReading"}.`,
+        );
+      }
+    }
     this.#readingsByStep.set(stepId, readings);
     this.#currentStep = null;
     return computeStepValidity(stepId, readings);

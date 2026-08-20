@@ -216,6 +216,27 @@ void test("CalibrationEngine: redoStep on one corner-vowel step doesn't affect t
   assert.equal(engine.isComplete(), true);
 });
 
+void test("CalibrationEngine: submitStep throws on StepReading submitted for a corner-vowel step", () => {
+  // Regression test: without the shape guard, StepReading's f0Hz field
+  // is absent from FormantStepReading, so a corner-vowel step's check
+  // read `reading.formants` (undefined) and compared `undefined !== null`
+  // (true) — every wrong-shaped reading silently counted as "voiced,"
+  // reporting a false-positive pass instead of failing loudly here.
+  const engine = new CalibrationEngine(null);
+  engine.beginStep("corner-i");
+  assert.throws(() => {
+    engine.submitStep(readings([200, 201]));
+  }, CalibrationEngineError);
+});
+
+void test("CalibrationEngine: submitStep throws on FormantStepReading submitted for a non-formant step", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep(2);
+  assert.throws(() => {
+    engine.submitStep(formantReadings([PLAUSIBLE_FORMANTS]));
+  }, CalibrationEngineError);
+});
+
 void test("CalibrationEngine: noise-floor check fails when step 0's level is above threshold", () => {
   const engine = new CalibrationEngine(null);
   engine.beginStep(0);
