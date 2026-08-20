@@ -10,7 +10,7 @@ The app describes what it hears; it doesn't grade you. There are no scores, no p
 
 ## Status
 
-v0.2 (of the plan in [docs/roadmap.md](docs/roadmap.md)): mic capture, a scrolling log-frequency spectrogram, a live F0 readout, and IndexedDB session storage with export/delete. Still pre-1.0 — expect rough edges, and see the roadmap for what's next.
+v0.2 shipped (of the plan in [docs/roadmap.md](docs/roadmap.md)): mic capture, a scrolling log-frequency spectrogram, a live F0 readout, and IndexedDB session storage with export/delete. v0.3 is in progress — the calibration step-sequencing engine (steps 0/1/2/4/5) and its IndexedDB store have landed, but corner-vowel formant capture (step 3) and the wizard UI itself haven't, so there's no user-facing calibration flow yet. Still pre-1.0 — expect rough edges, and see the roadmap for what's next.
 
 This paragraph is a snapshot, not a live source — the roadmap describes *intent* and can drift out of date. [docs/ledger.md](docs/ledger.md) is the append-only, per-issue record of what's actually shipped, anchored to real commit SHAs.
 
@@ -50,9 +50,11 @@ Solo project today, but it's built to hold up if that changes:
 - PRs use [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md): every test plan item needs concrete steps, where to look, and the expected result, not just a checkbox.
 - **Docs vs. specs**: reference docs (the ones listed in [docs/index.md](docs/index.md), written alongside the code they describe) plus the code itself and [docs/ledger.md](docs/ledger.md) are ground truth for what's actually shipped. [docs/roadmap.md](docs/roadmap.md), [docs/decisions.md](docs/decisions.md), and [docs/backlog.md](docs/backlog.md) describe intent — useful for direction, not proof something exists. See CLAUDE.md's "Docs vs. specs" rule.
 
-If you're working in this repo with [Claude Code](https://claude.com/claude-code), two pieces of repo-specific tooling live in `.claude/`:
+If you're working in this repo with [Claude Code](https://claude.com/claude-code), repo-specific tooling lives in `.claude/`:
 
-- **`/wizard-review [PR#]`** — four reviewer personas (correctness, security, simplicity, performance) independently review a PR, react to each other's findings, and post the whole discussion as comments on the PR itself.
+- **`/wizard-review [PR#]`** — four reviewer personas (correctness, security, simplicity, performance) independently review a PR, react to each other's findings, then a Scrum Master persona synthesizes the discussion, and the whole thing posts as comments on the PR itself.
+- **`/wizard-act [PR#]`** — follow-up to `/wizard-review`: reads the Scrum Master's summary and the wizard/human comments, checks which findings still hold against current code, then proposes concrete fixes in plan mode before editing anything.
+- `groomer`, `reviewer`, and `ledger-scribe` subagents — turning a roadmap item into a Ready issue, reviewing a diff against its issue's acceptance criteria, and appending `docs/ledger.md` rows after a PR merges, respectively.
 - A merge gate (`.claude/hooks/check-test-plan.sh`) blocks `gh pr merge`/`gh pr close` from a Claude Code session while the PR's Test plan section still has unchecked boxes. It only constrains Claude Code — merging by hand on GitHub is unaffected.
 
 ## License

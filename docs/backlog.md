@@ -23,21 +23,11 @@ for what's actually scheduled.
 
 Candidate `.claude/agents/*.md` beyond the existing wizard-review
 persona set (correctness/security/simplicity/performance, reviews
-PRs). Parked here rather than filed as issues since these are dev
-tooling, not versioned product scope — pick one, and it graduates
-straight to a drafted agent file, no milestone needed.
+PRs) and the shipped `groomer`, `reviewer`, and `ledger-scribe`
+subagents (PR #24). Parked here rather than filed as issues since
+these are dev tooling, not versioned product scope — pick one, and it
+graduates straight to a drafted agent file, no milestone needed.
 
-- **groomer** — turns a roadmap item into a well-formed, Ready issue
-  (acceptance criteria, size, layer, non-goals, edge cases). Already
-  drafted at `.claude/agents/groomer.md`, not yet committed.
-- **reviewer** — reviews a diff against its issue's acceptance
-  criteria and CLAUDE.md's non-negotiables. Already drafted at
-  `.claude/agents/reviewer.md`, not yet committed.
-- **ledger-scribe** — appends the correct `docs/ledger.md` row after a
-  PR merges, per that file's own "How to add a row" process (currently
-  a manual step). Project-specific, not pulled from an external
-  pattern. Drafted at `.claude/agents/ledger-scribe.md`, not yet run
-  end-to-end.
 - **debugger** — reproduces and root-causes a *live* failure (a flaky
   Playwright run, a spectrogram artifact), distinct from `reviewer`'s
   diff-vs-criteria job.
