@@ -14,6 +14,7 @@ import { initCalibrationWizard } from "./wizard";
 const button = requireElement<HTMLButtonElement>("#mic-toggle");
 const peakEl = requireElement<HTMLSpanElement>("#peak-db");
 const f0El = requireElement<HTMLSpanElement>("#f0-hz");
+const readoutAnnouncementEl = requireElement<HTMLParagraphElement>("#readout-announcement");
 const statusEl = requireElement<HTMLParagraphElement>("#mic-status");
 const canvas = requireElement<HTMLCanvasElement>("#spectrogram");
 const deleteAllButton = requireElement<HTMLButtonElement>("#delete-all");
@@ -36,9 +37,26 @@ const wizardController = initCalibrationWizard((wizardActive) => {
 // docs/session-store.md.
 const FRAME_LOG_INTERVAL_MS = 100;
 
+// #peak-db/#f0-hz are visual-only spans, updated on every ~60Hz rAF
+// tick — fine for a sighted user watching them continuously, but
+// there's no live region on them (the digits themselves are not what
+// gets announced; see READOUT_ANNOUNCE_INTERVAL_MS below).
+//
+// A screen-reader accessibility-tester audit found that even throttling
+// a role="status" region to 10Hz (this project's usual UI-update
+// cadence, see docs/session-store.md) still floods AT: role="status"
+// implies aria-live="polite", which *queues* rather than drops
+// announcements, so 10-20 queued announcements/second backs up into an
+// unstoppable stream a screen-reader user can't outrun. The actual
+// announcement (via #readout-announcement, a separate visually-hidden
+// role="status" region) is throttled far more coarsely instead — about
+// once a second, independent of the visual refresh rate.
+const READOUT_ANNOUNCE_INTERVAL_MS = 1000;
+
 let rafHandle: number | null = null;
 let currentSessionId: string | null = null;
 let lastFrameLoggedAt = 0;
+let lastAnnouncedAt = 0;
 
 function tick(): void {
   const spectrum = capture.getSpectrum();
@@ -51,19 +69,21 @@ function tick(): void {
     spectrogram.pushColumn(logBins);
     f0El.textContent = f0 !== null ? f0.toFixed(1) : "—";
   }
-
   peakEl.textContent = Number.isFinite(peak) ? peak.toFixed(1) : "—";
 
-  if (currentSessionId && info) {
-    const now = performance.now();
-    if (now - lastFrameLoggedAt >= FRAME_LOG_INTERVAL_MS) {
-      lastFrameLoggedAt = now;
-      void sessionStore.appendFrame(currentSessionId, {
-        timestamp: Date.now(),
-        f0Hz: f0,
-        peakDb: peak,
-      });
-    }
+  const now = performance.now();
+  if (now - lastAnnouncedAt >= READOUT_ANNOUNCE_INTERVAL_MS) {
+    lastAnnouncedAt = now;
+    readoutAnnouncementEl.textContent = `Peak ${peakEl.textContent} dB, F0 ${f0El.textContent} Hz`;
+  }
+
+  if (currentSessionId && info && now - lastFrameLoggedAt >= FRAME_LOG_INTERVAL_MS) {
+    lastFrameLoggedAt = now;
+    void sessionStore.appendFrame(currentSessionId, {
+      timestamp: Date.now(),
+      f0Hz: f0,
+      peakDb: peak,
+    });
   }
 
   rafHandle = requestAnimationFrame(tick);
@@ -132,6 +152,8 @@ async function handleStop(): Promise<void> {
   wizardController.setInstrumentActive(false);
   peakEl.textContent = "—";
   f0El.textContent = "—";
+  readoutAnnouncementEl.textContent = "";
+  lastAnnouncedAt = 0;
   statusEl.textContent = "Stopped";
   button.textContent = "Start capture";
   deleteAllButton.disabled = false;
