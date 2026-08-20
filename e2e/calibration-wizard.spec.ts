@@ -43,11 +43,34 @@ test("a full calibration attempt saves a Calibration record with frames for ever
   expect(calibration.timestamp).toBeGreaterThan(0);
   expect(calibration.validity.checks.length).toBeGreaterThan(0);
 
-  // Issue #52 intentionally saves with an empty raw-readings map (see
-  // "Persist raw calibration readings to calibrationFrames", a
-  // dependent follow-up) — no frames yet is the correct, documented
-  // behavior for this PR, not a bug.
-  expect(calibrationFrames).toHaveLength(0);
+  // Step durations sum to 29000ms at a 100ms reading interval, so
+  // ~290 readings is the naive expectation — asserting a generous
+  // range rather than an exact count, since setInterval/setTimeout
+  // timing isn't guaranteed precise and the very first tick of each
+  // step can land before capture.info is populated. This is a real
+  // regression check (a broken collection loop producing near-zero or
+  // wildly excessive frames would fail it), not a precise timing
+  // assertion.
+  expect(calibrationFrames.length).toBeGreaterThan(100);
+  expect(calibrationFrames.length).toBeLessThan(400);
+
+  for (const frame of calibrationFrames) {
+    expect(frame.schemaVersion).toBe(2);
+    expect(frame.calibrationId).toBe(calibration.id);
+    // f0Hz/formants split matches the step family that produced the
+    // frame — enforced by the caller (src/wizard.ts) passing the right
+    // reading shape per step, not by the store itself.
+    if (typeof frame.stepId === "string") {
+      expect(frame.f0Hz).toBeNull();
+      expect(
+        frame.formants === null ||
+          (Number.isFinite(frame.formants.f1Hz) && Number.isFinite(frame.formants.f2Hz)),
+      ).toBe(true);
+    } else {
+      expect(frame.formants).toBeNull();
+      expect(frame.f0Hz === null || Number.isFinite(frame.f0Hz)).toBe(true);
+    }
+  }
 });
 
 test("cancelling mid-wizard discards state and re-enables the instrument", async ({ page }) => {

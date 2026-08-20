@@ -236,6 +236,33 @@ for now," not "settled forever."
   (calibration produces a stored `Calibration` object) — the raw-frame
   persistence and accessibility follow-ups are real, tracked work, but
   outside that specific "done when" line.
+- A `wizard-correctness` review on the wizard's PR caught a real
+  concurrency bug: mutual exclusion between the instrument and the
+  wizard was UI-only (two callbacks, `setInstrumentActive`/
+  `onActiveChange`), and both sides' exclusivity claims fired only
+  *after* `capture.start()` resolved — not before. The native
+  getUserMedia permission prompt can stay open indefinitely, so a user
+  could click both start buttons while a prompt was pending and end up
+  with two concurrent `MicrophoneCapture` instances, both becoming
+  `"active"`, writing to two different IndexedDB stores at once.
+  `MicrophoneCapture#state` is a private per-instance field, not a
+  cross-instance registry (`src/audio`), so nothing there would have
+  caught it either. **The wizard PR's own description had originally
+  claimed `MicrophoneCapture.start()` already prevented this
+  cross-instance — that claim was false**, and review is what caught
+  it before merge, not after. Fixed by moving both exclusivity claims
+  to fire synchronously on click, before the `await` — JS is
+  single-threaded, so there's no tick left where both buttons are
+  clickable. The regression test added for this only checks the
+  disabled state *immediately* after click, not after the mic finishes
+  starting — the original test checked only post-resolution state and
+  wouldn't have caught the bug it was meant to guard against.
+- The raw-frame-persistence gap noted above closed in a follow-up:
+  `src/wizard.ts` now builds `rawReadingsByStep` from
+  `CalibrationEngine.getStepReadings()` for every step before calling
+  `saveCalibration()`, so `calibrationFrames` is populated for real,
+  not just proven-correct-but-unused by the store's own tests. See
+  [calibration-store.md](./calibration-store.md).
 
 ## Decided — process
 

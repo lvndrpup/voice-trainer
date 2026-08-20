@@ -289,6 +289,19 @@ void test("CalibrationEngine: getStepReadings returns raw readings for a submitt
   assert.deepEqual(engine.getStepReadings(0), submitted);
 });
 
+void test("CalibrationEngine: redoing a step replaces its readings, not accumulates them", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep(0);
+  engine.submitStep(readings([null, null, null], -70)); // first, noisy-ish attempt
+  engine.redoStep(0);
+  engine.beginStep(0);
+  const secondAttempt = readings([null], -80);
+  engine.submitStep(secondAttempt);
+  // Only the second attempt's readings should be there -- not the
+  // first attempt's three readings plus the second's one.
+  assert.deepEqual(engine.getStepReadings(0), secondAttempt);
+});
+
 void test("CalibrationEngine: noise-floor check passes when step 0's level is below threshold", () => {
   const engine = new CalibrationEngine(null);
   engine.beginStep(0);
