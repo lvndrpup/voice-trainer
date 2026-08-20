@@ -42,6 +42,15 @@ import { CalibrationStore } from "./store/calibration";
 // enough for MIN_VOICED_RATIO (0.5, src/calibration) to mean anything.
 const READING_INTERVAL_MS = 100;
 
+// [speculative] Not measured against a real screen reader — just long
+// enough that showValidity()'s role="status" text update gets its own
+// speech turn before the Next/Finish button's focus-change
+// announcement starts. wizard-review flagged the original hardcoded
+// 150 as an unsourced number; naming it here at least makes it one
+// tunable value instead of a bare literal, but the value itself is
+// still a guess pending real AT verification (see calibration-wizard.md).
+const FOCUS_ANNOUNCEMENT_DELAY_MS = 150;
+
 export interface WizardController {
   /** main.ts calls this whenever the instrument's own active state
    * changes, so the wizard can disable its start button while the
@@ -187,7 +196,7 @@ export function initCalibrationWizard(
     }
   }
 
-  function showProgress(index: number, stepId: StepId): void {
+  function showProgress(index: number, stepId: StepId, signal: AbortSignal): void {
     // Clear first, then set on the next tick, rather than writing the
     // real text directly — redoing a step re-shows identical text
     // (same step, same prompt), and several screen-reader/live-region
@@ -198,6 +207,13 @@ export function initCalibrationWizard(
     progressEl.textContent = "";
     promptEl.textContent = "";
     setTimeout(() => {
+      // Guard against a cancel landing inside this 0ms window — without
+      // it, a cancelled wizard could still write step text and steal
+      // focus back a tick after resetToIdle() already ran (wizard-review
+      // correctness finding: untracked timers racing abort/redo).
+      if (signal.aborted) {
+        return;
+      }
       progressEl.textContent = `Step ${index + 1} of ${STEP_ORDER.length}`;
       promptEl.textContent = stepPromptText(stepId);
       // aria-live="polite" on #wizard-step-info announces this on its
@@ -270,7 +286,7 @@ export function initCalibrationWizard(
       let index = 0;
       while (index < STEP_ORDER.length) {
         const stepId = STEP_ORDER[index];
-        showProgress(index, stepId);
+        showProgress(index, stepId, signal);
         showValidity(null);
         redoButton.hidden = true;
         nextButton.hidden = true;
@@ -302,8 +318,15 @@ export function initCalibrationWizard(
         // flagged the immediate version of this as a likely real
         // problem, not just a theoretical one.
         setTimeout(() => {
+          // Same abort guard as showProgress()'s timer — a redo or
+          // cancel that lands inside this window must not steal focus
+          // back after the step it belonged to is already gone
+          // (wizard-review correctness finding).
+          if (signal.aborted) {
+            return;
+          }
           claimFocusIfNotElsewhere(nextButton);
-        }, 150);
+        }, FOCUS_ANNOUNCEMENT_DELAY_MS);
 
         const action = await waitForUserAction(signal);
         if (action === "redo") {
@@ -323,10 +346,14 @@ export function initCalibrationWizard(
       }
       panel.hidden = true;
       statusEl.textContent = buildCompletionMessage(draft, saved);
-      // Panel is now hidden and its focusable controls are gone —
-      // move focus to the outcome message so it's both announced and
-      // reachable, instead of silently falling back to <body>.
-      statusEl.focus();
+      // Panel is now hidden and its focusable controls are gone, but
+      // routed through the same guard as every other focus call here —
+      // not unconditional. `saveCalibration()` above is awaited while
+      // the panel is still open; a user who tabbed away to the
+      // instrument's own controls during that window (wizard-review
+      // correctness finding) must not get yanked back just because the
+      // panel happened to close under them a moment later.
+      claimFocusIfNotElsewhere(statusEl);
     } catch (err) {
       if (!(err instanceof WizardCancelledError)) {
         throw err;
@@ -339,7 +366,7 @@ export function initCalibrationWizard(
       // focus to <body> for a keyboard user (accessibility-tester
       // audit finding).
       statusEl.textContent = "Calibration cancelled — nothing was saved.";
-      statusEl.focus();
+      claimFocusIfNotElsewhere(statusEl);
     } finally {
       await capture.stop();
       onActiveChange(false);
