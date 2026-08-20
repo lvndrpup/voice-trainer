@@ -2,13 +2,11 @@
 
 Reference doc for `estimateFormants` in `src/dsp/index.ts`. Consumed
 by the corner-vowel step engine (`src/calibration/index.ts`'s
-`corner-i`/`corner-a`/`corner-u` steps) — see
-[calibration.md](./calibration.md) and
-[calibration-store.md](./calibration-store.md). What's still missing
-is the production wiring: nothing in `main.ts`/`index.html` yet calls
-`estimateFormants` on real capture and feeds the result into the
-engine — that's the wizard UI, deliberately deferred (see
-[decisions.md](./decisions.md)).
+`corner-i`/`corner-a`/`corner-u` steps), which `src/wizard.ts` now
+drives from real microphone capture — see
+[calibration.md](./calibration.md),
+[calibration-store.md](./calibration-store.md), and
+[calibration-wizard.md](./calibration-wizard.md).
 
 ## Data flow
 
@@ -16,7 +14,7 @@ engine — that's the wizard UI, deliberately deferred (see
 graph LR
     AN["AnalyserNode<br/>(src/audio)"] -->|getWaveform: Float32Array, time domain| DSP["estimateFormants<br/>(src/dsp)"]
     DSP -->|"{f1Hz, f2Hz}, or null"| CAL["corner-vowel steps<br/>(src/calibration)"]
-    CAL -.->|not yet wired| UI["wizard UI<br/>(main.ts, not yet built)"]
+    CAL --> WIZ["src/wizard.ts"]
 ```
 
 Same input source as `detectPitch` — `getWaveform()`'s time-domain

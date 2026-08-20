@@ -49,14 +49,17 @@ documented interface (a separate, functional gap — raw frame storage
   primary key — IndexedDB needs a `keyPath` to store records at all, so
   one was added, mirroring `Session.id`.
 
-`cornerVowels` now has a producer — `CalibrationEngine.buildDraft()`
+`cornerVowels` has a producer — `CalibrationEngine.buildDraft()`
 (`src/calibration`) populates it from the three corner-vowel steps'
 formant readings, `null` only if any of the three vowels never
-produced a confident formant. Nothing in `src/` calls `buildDraft()`
-in production yet, though — the wizard UI wiring (`index.html`/
-`main.ts`) that would actually drive a calibration attempt through
-this store is a separate, still-pending follow-up (calibration.md's
-`decisions.md` entry on step 3).
+produced a confident formant. `src/wizard.ts` now drives a real
+calibration attempt end-to-end (mic capture → 8 engine steps →
+`buildDraft()` → `saveCalibration()`) — see
+[the wizard doc](./calibration-wizard.md). One deliberate gap that
+issue left open: it saves with an empty `rawReadingsByStep` map, so
+`calibrationFrames` stays empty until a dependent follow-up wires
+`CalibrationEngine.getStepReadings()` through — see "Known gaps"
+below.
 
 ## Raw frame storage
 
@@ -118,14 +121,16 @@ the shared `src/store/idb.ts` helpers all these stores are built on.
 
 ## Known gaps
 
-- Same as `SessionStore`: no Node-level unit tests, since there's no
-  Node `indexedDB` global — needs a real browser (Playwright), which
-  this store doesn't get until a UI exists to drive it through (see
-  ADR 0004).
 - No storage-quota handling, same caveat as session-store.md.
 - No migration path — `CALIBRATION_SCHEMA_VERSION` exists and is
   stamped, but nothing reads it yet.
+- The wizard (`src/wizard.ts`) currently saves every calibration with
+  an empty `rawReadingsByStep` map — `calibrationFrames` never gets
+  written to in production yet, even though `saveCalibration()` and
+  `getCalibrationFrames()` both work correctly against it (proven by
+  this store's own tests). A dependent follow-up issue wires
+  `CalibrationEngine.getStepReadings()` through for real.
 - Nothing yet actually *recomputes* a calibration from
-  `calibrationFrames` — this PR only closes the storage half of
-  calibration.md's ask (the data exists to do it later), not the
-  recompute feature itself.
+  `calibrationFrames` — a separate, further-out gap from the one
+  above; the data doesn't even get written yet, so recompute isn't
+  reachable regardless.
