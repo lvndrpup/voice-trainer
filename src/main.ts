@@ -10,9 +10,10 @@ import {
   MicrophoneConstraintsUnsupportedError,
   AudioContextSuspendedError,
 } from "./audio";
-import { computeLogFrequencyBins, detectPitch } from "./dsp";
+import { computeLogFrequencyBins } from "./dsp";
 import { SpectrogramRenderer } from "./render";
 import { SessionStore, sessionsToExportJson } from "./store";
+import { readTickFeatures } from "./tick-features";
 
 // T is set by the caller's explicit type argument (mirrors DOM's own
 // querySelector<T>), not inferred from the selector string.
@@ -45,26 +46,15 @@ let rafHandle: number | null = null;
 let currentSessionId: string | null = null;
 let lastFrameLoggedAt = 0;
 
-function peakDb(spectrum: Float32Array): number {
-  let peak = -Infinity;
-  for (const value of spectrum) {
-    if (value > peak) peak = value;
-  }
-  return peak;
-}
-
 function tick(): void {
   const spectrum = capture.getSpectrum();
   const info = capture.info;
-  const peak = peakDb(spectrum);
-  let f0: number | null = null;
+  const waveform = info ? capture.getWaveform() : null;
+  const { peakDb: peak, f0Hz: f0 } = readTickFeatures(spectrum, waveform, info?.sampleRate ?? null);
 
   if (info) {
     const logBins = computeLogFrequencyBins(spectrum, info.sampleRate, canvas.height);
     spectrogram.pushColumn(logBins);
-
-    const waveform = capture.getWaveform();
-    f0 = detectPitch(waveform, info.sampleRate);
     f0El.textContent = f0 !== null ? f0.toFixed(1) : "—";
   }
 
