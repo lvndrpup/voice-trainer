@@ -22,6 +22,7 @@ runs client-side: audio never leaves the browser.
 - [Formant extraction](./formant-extraction.md) — the LPC-based F1/F2 estimator
 - [Session store](./session-store.md) — IndexedDB schema and the SessionStore API
 - [Calibration store](./calibration-store.md) — IndexedDB schema and the CalibrationStore API
+- [Calibration wizard](./calibration-wizard.md) — the DOM wiring that drives a real calibration attempt
 - [Testing](./testing.md) — unit tests vs. the Playwright e2e suite, and how to run each
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record
 - [ADR 0002: Raw getUserMedia constraints (AGC off)](./adr/0002-agc-off-raw-constraints.md) — architecture decision record

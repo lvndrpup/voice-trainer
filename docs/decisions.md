@@ -209,6 +209,33 @@ for now," not "settled forever."
   `undefined` from old records, not `null`. Unreachable today (no
   reader exists), worth a guard whenever `getCalibrationFrames` gets
   a consumer, not built speculatively now.
+- Calibration's wizard UI landed — `src/wizard.ts`, a sibling module
+  to `main.ts` rather than a growth of it (main.ts was already ~200
+  lines; this feature roughly doubles that surface). Not under
+  `src/calibration/` either, since that module must stay headless.
+  Two-way coordination between `main.ts` and `wizard.ts` (each
+  disables the other's start control while active, since they need
+  exclusive use of the microphone) is two small callbacks rather than
+  either module owning the other. Step timing is wall-clock
+  (`setInterval`/`setTimeout`), not `requestAnimationFrame`-driven,
+  specifically because a backgrounded tab throttles rAF and would
+  otherwise silently stretch a step's real duration. Cancellation uses
+  a plain `AbortController` rather than a bespoke cancellation flag,
+  covering both an in-progress reading-collection window and a
+  pending "waiting for Next/Redo" promise with the same mechanism.
+  See [calibration-wizard.md](./calibration-wizard.md) for the full
+  data flow and design rationale. Deliberately incomplete in one
+  documented way: saves every calibration with an empty
+  `rawReadingsByStep` map (`calibrationFrames` stays unwritten in
+  production) — a dependent follow-up issue closes that gap, tracked
+  separately rather than bundled in, since the wizard is a complete,
+  working feature without it (CLAUDE.md's "no half-finished
+  implementations" is about the user-facing feature, not about every
+  possible storage completeness gap being closed atomically with it).
+  v0.3 is now complete per [roadmap.md](./roadmap.md)'s criterion
+  (calibration produces a stored `Calibration` object) — the raw-frame
+  persistence and accessibility follow-ups are real, tracked work, but
+  outside that specific "done when" line.
 
 ## Decided — process
 

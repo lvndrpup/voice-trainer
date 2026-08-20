@@ -30,7 +30,12 @@ export type CornerVowel = "i" | "a" | "u";
 export type CornerVowelStepId = `corner-${CornerVowel}`;
 export type StepId = NonFormantStepId | CornerVowelStepId;
 
-function isCornerVowelStepId(id: StepId): id is CornerVowelStepId {
+/** Exported for src/wizard.ts, which needs the same step-family check
+ * to decide whether to collect StepReading or FormantStepReading —
+ * a wizard-review pass found it had reimplemented this inline instead
+ * of importing it, an accidental duplication risk if StepId ever grew
+ * another string-shaped member. */
+export function isCornerVowelStepId(id: StepId): id is CornerVowelStepId {
   return typeof id === "string";
 }
 

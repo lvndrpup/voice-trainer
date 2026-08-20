@@ -17,6 +17,21 @@
         <button id="export-json" type="button">Export sessions as JSON</button>
       </p>
     </main>
+    <section id="calibration">
+      <h2>Calibration</h2>
+      <button id="wizard-start" type="button">Start calibration</button>
+      <div id="wizard-panel" hidden>
+        <p id="wizard-progress"></p>
+        <p id="wizard-prompt"></p>
+        <p id="wizard-validity" role="status"></p>
+        <p>
+          <button id="wizard-redo" type="button" hidden>Redo this step</button>
+          <button id="wizard-next" type="button" hidden>Next</button>
+          <button id="wizard-cancel" type="button">Cancel</button>
+        </p>
+      </div>
+      <p id="wizard-status" role="status"></p>
+    </section>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

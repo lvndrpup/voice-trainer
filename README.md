@@ -10,7 +10,7 @@ The app describes what it hears; it doesn't grade you. There are no scores, no p
 
 ## Status
 
-v0.2 shipped (of the plan in [docs/roadmap.md](docs/roadmap.md)): mic capture, a scrolling log-frequency spectrogram, a live F0 readout, and IndexedDB session storage with export/delete. v0.3 is in progress — the full 6-step calibration engine (including corner-vowel formant capture, LPC-based) and its IndexedDB store have landed, but the wizard UI itself (`index.html`/`main.ts` wiring) hasn't, so there's no user-facing calibration flow yet. Still pre-1.0 — expect rough edges, and see the roadmap for what's next.
+v0.3 shipped (of the plan in [docs/roadmap.md](docs/roadmap.md)): mic capture, a scrolling log-frequency spectrogram, a live F0 readout, IndexedDB session storage with export/delete, and a full 6-step calibration wizard (including corner-vowel formant capture, LPC-based) that produces and stores a real `Calibration` object. Two follow-ups remain open — persisting raw per-step readings, and an accessibility pass on the wizard's own UI — but neither blocks v0.3's own "done when" criterion. Still pre-1.0 — expect rough edges, and see the roadmap for what's next.
 
 This paragraph is a snapshot, not a live source — the roadmap describes *intent* and can drift out of date. [docs/ledger.md](docs/ledger.md) is the append-only, per-issue record of what's actually shipped, anchored to real commit SHAs.
 

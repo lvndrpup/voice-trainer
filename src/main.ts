@@ -2,29 +2,14 @@
 // together for the v0.1 instrument display. See docs/audio-capture.md
 // and docs/spectrogram.md.
 
-import {
-  MicrophoneCapture,
-  MicrophonePermissionDeniedError,
-  MicrophoneNotFoundError,
-  MicrophoneHardwareError,
-  MicrophoneConstraintsUnsupportedError,
-  AudioContextSuspendedError,
-} from "./audio";
+import { MicrophoneCapture } from "./audio";
 import { computeLogFrequencyBins } from "./dsp";
 import { SpectrogramRenderer } from "./render";
 import { SessionStore, sessionsToExportJson } from "./store";
 import { readTickFeatures } from "./tick-features";
-
-// T is set by the caller's explicit type argument (mirrors DOM's own
-// querySelector<T>), not inferred from the selector string.
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-function requireElement<T extends Element>(selector: string): T {
-  const el = document.querySelector<T>(selector);
-  if (!el) {
-    throw new Error(`Expected element matching "${selector}" in index.html.`);
-  }
-  return el;
-}
+import { requireElement } from "./dom";
+import { describeCaptureError } from "./describe-capture-error";
+import { initCalibrationWizard } from "./wizard";
 
 const button = requireElement<HTMLButtonElement>("#mic-toggle");
 const peakEl = requireElement<HTMLSpanElement>("#peak-db");
@@ -37,6 +22,15 @@ const exportButton = requireElement<HTMLButtonElement>("#export-json");
 const capture = new MicrophoneCapture();
 const spectrogram = new SpectrogramRenderer(canvas);
 const sessionStore = new SessionStore();
+
+// The instrument and the calibration wizard both need exclusive use of
+// the microphone — running both at once would also double-write to
+// two different stores in a confusing way. Each side disables the
+// other's start control while it's active; see wizard.ts's own header
+// comment for the other half of this two-way wiring.
+const wizardController = initCalibrationWizard((wizardActive) => {
+  button.disabled = wizardActive;
+});
 
 // Feature-frame logging rate, not the ~60Hz tick() rate — see
 // docs/session-store.md.
@@ -75,28 +69,19 @@ function tick(): void {
   rafHandle = requestAnimationFrame(tick);
 }
 
-function describeError(err: unknown): string {
-  if (err instanceof MicrophonePermissionDeniedError) {
-    return "Microphone permission denied.";
-  }
-  if (err instanceof MicrophoneNotFoundError) {
-    return "No microphone found.";
-  }
-  if (err instanceof MicrophoneHardwareError) {
-    return "Microphone is in use or unavailable.";
-  }
-  if (err instanceof MicrophoneConstraintsUnsupportedError) {
-    return "This device/browser can't disable echo cancellation, noise suppression, and AGC.";
-  }
-  if (err instanceof AudioContextSuspendedError) {
-    return "Audio is suspended — click Start again.";
-  }
-  return `Capture failed: ${err instanceof Error ? err.message : String(err)}`;
-}
-
 async function handleStart(): Promise<void> {
   button.disabled = true;
   statusEl.textContent = "Requesting microphone…";
+  // Claim exclusivity *before* awaiting capture.start(), not after it
+  // resolves — the native getUserMedia permission prompt can stay open
+  // indefinitely, and a wizard-review correctness pass found that
+  // gating on the resolved state left a real window where both this
+  // instrument and the wizard could have a permission prompt pending
+  // at once, then both become active. Neither MicrophoneCapture
+  // instance would reject that — #state is a private per-instance
+  // field, not a cross-instance registry (src/audio/index.ts) — so
+  // this claim is the only thing actually closing the window.
+  wizardController.setInstrumentActive(true);
   try {
     const info = await capture.start();
     let statusText = `Capturing (device ${info.deviceId ?? "unknown"})`;
@@ -120,7 +105,8 @@ async function handleStart(): Promise<void> {
     lastFrameLoggedAt = 0;
     tick();
   } catch (err) {
-    statusEl.textContent = describeError(err);
+    statusEl.textContent = describeCaptureError(err);
+    wizardController.setInstrumentActive(false);
     throw err;
   } finally {
     button.disabled = false;
@@ -143,6 +129,7 @@ async function handleStop(): Promise<void> {
   }
 
   await capture.stop();
+  wizardController.setInstrumentActive(false);
   peakEl.textContent = "—";
   f0El.textContent = "—";
   statusEl.textContent = "Stopped";
