@@ -223,6 +223,26 @@ for now," not "settled forever."
   [pitch-detection.md](./pitch-detection.md). v0.1 is now complete per
   [roadmap.md](./roadmap.md)'s criterion (mic capture, spectrogram, and
   F0 readout all run; nothing is stored).
+- "Custom FFT/LPC deferred until golden-file fixtures exist" (Decided —
+  architecture, above) is now partly landed: `estimateFormants`
+  (`src/dsp/index.ts`) is the first custom LPC code in the project. It
+  did **not** wait for a true golden-file/oracle-comparison harness —
+  it uses the same lighter synthetic-self-consistency bar the earlier
+  "Corrected" entry below already established for
+  `computeLogFrequencyBins`/`detectPitch` (synthesize a signal with
+  known ground truth, assert recovery within tolerance), not an
+  external reference implementation. Decimates to a fixed working rate
+  (`2 * maxFormantHz`) before LPC analysis rather than scaling the
+  predictor order to the raw capture rate, and peak-picks the spectral
+  envelope rather than root-finding the LPC denominator (avoids a
+  complex-polynomial-root dependency). See
+  [formant-extraction.md](./formant-extraction.md) for the full
+  rationale. **Not validated against real voice** — only against a
+  crude synthetic source-filter model; a small systematic bias (a few
+  percent, consistent across sample rates) is visible even there. Real-
+  recording validation is a follow-up, not resolved by this entry.
+  Calibration step 3 (wiring this into the calibration engine) is a
+  separate, dependent follow-up issue — not part of this landing.
 - Streak ban was initially blanket. Narrowed: adherence streaks are
   fine and probably good (practice frequency is the real predictor);
   performance streaks remain forbidden.

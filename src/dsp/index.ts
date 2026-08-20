@@ -210,6 +210,344 @@ export function estimateComfortableF0Range(
   return [floorHz, ceilingHz];
 }
 
+export interface Formants {
+  f1Hz: number;
+  f2Hz: number;
+}
+
+export interface FormantExtractionOptions {
+  /** Lower bound of the formant search range. Default 150Hz — below the
+   * typical F1 floor for any vowel, leaves margin without wandering into
+   * F0/harmonic territory. Algorithm search bound, not a coaching target;
+   * same category as detectPitch's minFrequencyHz. */
+  minFormantHz?: number;
+  /** Upper bound of the search range, and (via `2 * maxFormantHz`) the
+   * target rate the signal is decimated to before LPC analysis — see the
+   * module doc comment below for why. Default 5000Hz, comfortably above
+   * F2 for any vowel in adult speech. Algorithm parameter, not a target. */
+  maxFormantHz?: number;
+  /** LPC predictor order. Default 12 (see below) if unset. */
+  lpcOrder?: number;
+  /** Two spectral-envelope peaks closer together than this are treated as
+   * one ambiguous peak, not two formants — default 150Hz. */
+  minPeakSeparationHz?: number;
+  /** Minimum topographic prominence (dB) for a spectral-envelope local
+   * maximum to count as a real resonance rather than numerical ripple
+   * from an LPC pole with nothing principled to model — see
+   * findSpectralPeaks. Default 3dB; real formant peaks are typically
+   * far more prominent than this, spurious ripple from unvoiced/noisy
+   * input typically isn't. */
+  minPeakProminenceDb?: number;
+}
+
+/**
+ * Estimates the first two formants (F1, F2) of a voiced vowel window via
+ * linear predictive coding: decimate → pre-emphasize → Hamming window →
+ * autocorrelation → Levinson-Durbin → peak-pick the resulting all-pole
+ * spectral envelope. Returns null (never a misleading number, same
+ * convention as detectPitch) for silence, an ill-conditioned/degenerate
+ * window, or fewer than two sufficiently prominent, adequately-separated
+ * spectral peaks in range — including unvoiced/noisy input that happens
+ * to be numerically well-conditioned (e.g. white noise): LPC still fits
+ * *some* all-pole model to it, but the resulting peaks are typically weak
+ * ripple, not real resonances, which `minPeakProminenceDb` exists to
+ * reject rather than reporting them as confident formants.
+ *
+ * Decimates to `2 * maxFormantHz` (10kHz at the default 5000Hz) before
+ * analysis, mirroring standard formant-analysis practice (e.g. Praat):
+ * running LPC directly at a raw 44.1k/48k capture rate would need a much
+ * higher predictor order to span that bandwidth, most of which is
+ * irrelevant to F1/F2, and produces a wigglier envelope more prone to
+ * spurious peaks. Decimating first means `lpcOrder`'s default (12) is a
+ * fixed value tuned to the working rate rather than the raw one — capture
+ * rate stops mattering at all once the signal is downsampled, which is a
+ * cleaner way to avoid the "misbehaves at 44.1k vs 48k" failure mode than
+ * scaling the order to the raw rate would be. See docs/formant-extraction.md.
+ *
+ * Peak-picking (scan the envelope, take local maxima) was chosen over
+ * polynomial root-finding for the LPC denominator: root-finding is more
+ * precise but needs complex-number polynomial root arithmetic, which this
+ * project doesn't already depend on — adding it would mean either writing
+ * a general complex root-finder from scratch or asking to add a
+ * dependency (CLAUDE.md: ask before adding one). Peak-picking is real-
+ * arithmetic-only and reuses the same parabolic-interpolation technique
+ * detectPitch already applies to its own correlation peak.
+ */
+export function estimateFormants(
+  samples: Float32Array,
+  sampleRate: number,
+  options: FormantExtractionOptions = {},
+): Formants | null {
+  const minFormantHz = options.minFormantHz ?? 150;
+  const maxFormantHz = options.maxFormantHz ?? 5000;
+  const lpcOrder = options.lpcOrder ?? 12;
+  const minPeakSeparationHz = options.minPeakSeparationHz ?? 150;
+  const minPeakProminenceDb = options.minPeakProminenceDb ?? 3;
+
+  if (samples.length < 2) {
+    throw new Error("samples must have at least 2 elements.");
+  }
+  if (!(sampleRate > 0)) {
+    throw new Error("sampleRate must be > 0.");
+  }
+  if (!(minFormantHz > 0) || !(maxFormantHz > minFormantHz)) {
+    throw new Error("minFormantHz must be > 0 and less than maxFormantHz.");
+  }
+  if (!Number.isInteger(lpcOrder) || lpcOrder < 2) {
+    throw new Error("lpcOrder must be an integer >= 2.");
+  }
+
+  let totalEnergy = 0;
+  for (const sample of samples) {
+    totalEnergy += sample * sample;
+  }
+  if (totalEnergy === 0) {
+    return null; // silence
+  }
+
+  const targetRateHz = 2 * maxFormantHz;
+  const { samples: working, sampleRate: workingRate } = decimate(samples, sampleRate, targetRateHz);
+  if (working.length <= lpcOrder) {
+    throw new Error(
+      `samples must contain more than lpcOrder (${lpcOrder}) samples after decimation; ` +
+        `got ${working.length} (from ${samples.length} at ${sampleRate}Hz, decimated to ${workingRate}Hz).`,
+    );
+  }
+
+  const emphasized = preEmphasize(working);
+  const windowed = applyHammingWindow(emphasized);
+  const autocorrelation = autocorrelate(windowed, lpcOrder);
+  const coefficients = levinsonDurbin(autocorrelation, lpcOrder);
+  if (coefficients === null) {
+    return null; // ill-conditioned (e.g. unvoiced/noisy input)
+  }
+
+  const nyquistMargin = workingRate / 2 - 1;
+  const searchMaxHz = Math.min(maxFormantHz, nyquistMargin);
+  if (searchMaxHz <= minFormantHz) {
+    return null; // degenerate range, e.g. maxFormantHz too close to Nyquist
+  }
+  const peaks = findSpectralPeaks(coefficients, workingRate, minFormantHz, searchMaxHz);
+  const filtered = filterSpectralPeaks(peaks, minPeakProminenceDb, minPeakSeparationHz);
+
+  if (filtered.length < 2) {
+    return null;
+  }
+  return { f1Hz: filtered[0], f2Hz: filtered[1] };
+}
+
+/** Windowed-sinc lowpass FIR (Hamming window), used only to anti-alias
+ * before decimate()'s subsampling — see estimateFormants's doc comment. */
+function lowpassFirTaps(cutoffHz: number, sampleRate: number, halfLength: number): Float64Array {
+  const length = 2 * halfLength + 1;
+  const taps = new Float64Array(length);
+  const normalizedCutoff = cutoffHz / sampleRate;
+  for (let i = 0; i < length; i++) {
+    const n = i - halfLength;
+    const sinc = n === 0 ? 2 * normalizedCutoff : Math.sin(2 * Math.PI * normalizedCutoff * n) / (Math.PI * n);
+    const hamming = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (length - 1));
+    taps[i] = sinc * hamming;
+  }
+  let dcGain = 0;
+  for (const tap of taps) dcGain += tap;
+  if (dcGain !== 0) {
+    for (let i = 0; i < length; i++) taps[i] /= dcGain;
+  }
+  return taps;
+}
+
+function applyFir(samples: Float32Array, taps: Float64Array): Float64Array {
+  const halfLength = (taps.length - 1) / 2;
+  const output = new Float64Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    let accumulator = 0;
+    for (let k = 0; k < taps.length; k++) {
+      const sampleIndex = i + k - halfLength;
+      if (sampleIndex >= 0 && sampleIndex < samples.length) {
+        accumulator += taps[k] * samples[sampleIndex];
+      }
+    }
+    output[i] = accumulator;
+  }
+  return output;
+}
+
+/** Lowpass-filters (if decimating) and subsamples to ~targetRateHz. A
+ * no-op (beyond a Float64Array copy) when sampleRate is already at or
+ * below the target, e.g. a synthetic test running at 8kHz. */
+function decimate(
+  samples: Float32Array,
+  sampleRate: number,
+  targetRateHz: number,
+): { samples: Float64Array; sampleRate: number } {
+  const factor = Math.max(1, Math.floor(sampleRate / targetRateHz));
+  if (factor === 1) {
+    return { samples: Float64Array.from(samples), sampleRate };
+  }
+  const newRate = sampleRate / factor;
+  const cutoffHz = (newRate / 2) * 0.9; // margin below the new Nyquist
+  const taps = lowpassFirTaps(cutoffHz, sampleRate, 32);
+  const filtered = applyFir(samples, taps);
+  const decimatedLength = Math.floor(filtered.length / factor);
+  const decimated = new Float64Array(decimatedLength);
+  for (let i = 0; i < decimatedLength; i++) {
+    decimated[i] = filtered[i * factor];
+  }
+  return { samples: decimated, sampleRate: newRate };
+}
+
+/** y[n] = x[n] - alpha*x[n-1]. Flattens voiced speech's natural
+ * -6dB/octave spectral tilt so LPC models the vocal-tract resonances
+ * rather than mostly re-deriving the tilt. alpha=0.97 is the standard
+ * value used throughout the LPC/formant-analysis literature. */
+function preEmphasize(samples: Float64Array, alpha = 0.97): Float64Array {
+  const output = new Float64Array(samples.length);
+  output[0] = samples[0];
+  for (let i = 1; i < samples.length; i++) {
+    output[i] = samples[i] - alpha * samples[i - 1];
+  }
+  return output;
+}
+
+function applyHammingWindow(samples: Float64Array): Float64Array {
+  const n = samples.length;
+  const output = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (n - 1));
+    output[i] = samples[i] * weight;
+  }
+  return output;
+}
+
+function autocorrelate(samples: Float64Array, maxLag: number): Float64Array {
+  const r = new Float64Array(maxLag + 1);
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < samples.length - lag; i++) {
+      sum += samples[i] * samples[i + lag];
+    }
+    r[lag] = sum;
+  }
+  return r;
+}
+
+/** Solves for LPC coefficients a[1..order] (a[0] implicitly 1) via the
+ * Levinson-Durbin recursion over autocorrelation r[0..order], such that
+ * the all-pole denominator is D(z) = 1 - sum_k a[k] z^-k. Returns null if
+ * the input is degenerate (no energy, or a reflection coefficient with
+ * |k| >= 1 makes the prediction error non-positive — an ill-conditioned
+ * or non-predictable signal, e.g. white noise). */
+function levinsonDurbin(r: Float64Array, order: number): Float64Array | null {
+  if (!(r[0] > 0)) {
+    return null;
+  }
+  let a = new Float64Array(order + 1);
+  let error = r[0];
+  for (let i = 1; i <= order; i++) {
+    let acc = r[i];
+    for (let j = 1; j < i; j++) {
+      acc -= a[j] * r[i - j];
+    }
+    const reflection = acc / error;
+    const previousA = a;
+    a = new Float64Array(order + 1);
+    a.set(previousA);
+    a[i] = reflection;
+    for (let j = 1; j < i; j++) {
+      a[j] = previousA[j] - reflection * previousA[i - j];
+    }
+    error *= 1 - reflection * reflection;
+    if (!(error > 0)) {
+      return null;
+    }
+  }
+  return a.slice(1, order + 1);
+}
+
+/** |H(e^jw)| = 1 / |D(e^jw)| for the all-pole model, evaluated at a
+ * single frequency. Used only for peak-picking the envelope shape, so
+ * the overall gain term is omitted — it doesn't move peak locations. */
+function lpcMagnitudeAt(coefficients: Float64Array, freqHz: number, workingRate: number): number {
+  const omega = (2 * Math.PI * freqHz) / workingRate;
+  let realPart = 1;
+  let imagPart = 0;
+  for (let k = 1; k <= coefficients.length; k++) {
+    const angle = omega * k;
+    realPart -= coefficients[k - 1] * Math.cos(angle);
+    imagPart += coefficients[k - 1] * Math.sin(angle);
+  }
+  const denominatorMagSq = realPart * realPart + imagPart * imagPart;
+  return denominatorMagSq === 0 ? Number.POSITIVE_INFINITY : 1 / Math.sqrt(denominatorMagSq);
+}
+
+interface SpectralPeak {
+  freqHz: number;
+  prominenceDb: number;
+}
+
+/** Scans [minHz, maxHz] on a fixed grid, returns ascending-frequency
+ * local maxima of the LPC envelope (in dB, for a numerically well-behaved
+ * parabolic fit near sharp poles), each refined via the same parabolic-
+ * interpolation technique detectPitch uses on its correlation peak, and
+ * tagged with topographic prominence (peak height minus the higher of
+ * the lowest points on either side before the envelope would rise again)
+ * so a caller can reject peaks that are just numerical ripple rather than
+ * a real resonance — see estimateFormants's `minPeakProminenceDb`. */
+function findSpectralPeaks(
+  coefficients: Float64Array,
+  workingRate: number,
+  minHz: number,
+  maxHz: number,
+): SpectralPeak[] {
+  const gridStepHz = 5;
+  const freqs: number[] = [];
+  const magsDb: number[] = [];
+  for (let f = minHz; f <= maxHz; f += gridStepHz) {
+    freqs.push(f);
+    magsDb.push(20 * Math.log10(lpcMagnitudeAt(coefficients, f, workingRate)));
+  }
+
+  const peaks: SpectralPeak[] = [];
+  for (let i = 1; i < magsDb.length - 1; i++) {
+    const y0 = magsDb[i - 1];
+    const y1 = magsDb[i];
+    const y2 = magsDb[i + 1];
+    if (y1 > y0 && y1 > y2) {
+      const denominator = y0 - 2 * y1 + y2;
+      const offset = denominator === 0 ? 0 : (0.5 * (y0 - y2)) / denominator;
+      let leftMin = y1;
+      for (let j = i - 1; j >= 0 && magsDb[j] <= y1; j--) leftMin = Math.min(leftMin, magsDb[j]);
+      let rightMin = y1;
+      for (let j = i + 1; j < magsDb.length && magsDb[j] <= y1; j++) rightMin = Math.min(rightMin, magsDb[j]);
+      peaks.push({
+        freqHz: freqs[i] + offset * gridStepHz,
+        prominenceDb: y1 - Math.max(leftMin, rightMin),
+      });
+    }
+  }
+  return peaks;
+}
+
+/** Drops peaks below the prominence floor, then collapses any remaining
+ * ascending-frequency peaks closer together than minSeparationHz into
+ * one (the LPC envelope splitting a single broad resonance into two
+ * nearby local maxima) — keeps the first of each such cluster, rather
+ * than reporting two formants that are really one. */
+function filterSpectralPeaks(
+  peaks: readonly SpectralPeak[],
+  minProminenceDb: number,
+  minSeparationHz: number,
+): number[] {
+  const prominent = peaks.filter((peak) => peak.prominenceDb >= minProminenceDb);
+  const kept: number[] = [];
+  for (const peak of prominent) {
+    if (kept.length === 0 || peak.freqHz - kept[kept.length - 1] >= minSeparationHz) {
+      kept.push(peak.freqHz);
+    }
+  }
+  return kept;
+}
+
 function normalizedCorrelationAtLag(samples: Float32Array, lag: number): number {
   let correlation = 0;
   let localEnergy = 0;
