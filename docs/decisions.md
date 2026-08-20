@@ -241,6 +241,70 @@ for now," not "settled forever."
   cycle before it was written down here — CLAUDE.md's rule is that
   docs land in the same commit as the code they describe, and process
   conventions are no exception, they'd just been missed once.
+- Read-only subagents' "never edit files" claims are now backed by a
+  real, if partial, technical control, not prose alone — surfaced by
+  `wizard-correctness` independently on three PRs in a row (#37, #39,
+  #40), tracked as issue #41. `.claude/hooks/deny-bash-writes.sh` is a
+  `PreToolUse` hook denying shell-level write primitives (a mutating
+  command like `rm`/`sed -i`/`git commit`, or output redirected
+  outside `/tmp`) — wired into `groomer`/`reviewer`/`docs-auditor`/
+  `dsp-numerics-auditor` via each agent's own frontmatter `hooks:`
+  block (Claude Code scopes a subagent-declared hook to just that
+  subagent, removed when it finishes — no global `settings.json`
+  change needed, so it can't affect the main session or any other
+  agent). Investigated first and rejected: a *global* write-blocking
+  hook, since it would also block the main session's own legitimate
+  Bash usage (this session commits code, edits files via heredoc,
+  etc. constantly) and there's no reliable way to distinguish "which
+  subagent, if any, issued this call" from a global hook scope without
+  the per-agent frontmatter mechanism.
+
+  Two agents were handled differently, deliberately: `accessibility-
+  tester` had `Bash` dropped from its tool grant entirely — nothing in
+  its actual instructions (Read/Grep/Glob only) ever needed it, so the
+  real fix was narrower tool scoping, not a hook guarding a tool it
+  didn't need. `debugger` keeps `Bash` unguarded — its entire job is
+  running arbitrary project commands to reproduce a failure (test
+  runs, builds, `git bisect`), which a static "no mutating commands"
+  rule would have to special-case so heavily (`git stash`, build
+  commands that write `dist/`) that it stopped meaningfully
+  constraining anything; instead its own instructions were
+  strengthened with explicit `git bisect reset` discipline, per a
+  wizard-review addendum that specifically flagged bisect's
+  stateful-not-just-write risk.
+
+  Explicit limitation, not overclaimed: the hook inspects the literal
+  Bash command string, not what a spawned interpreter's own code does
+  — `node -e "fs.writeFileSync(...)"` wouldn't read as write-shaped to
+  a shell-syntax check, so `dsp-numerics-auditor`'s "import from
+  source, don't fabricate results" instruction still matters on its
+  own merits, not merely because a hook exists. This is a real,
+  meaningful reduction in the class of accidental edits (a stray
+  `sed -i`, a habitual `git commit`, an errant redirect into a tracked
+  file) — not a sandbox, and not claimed as one.
+
+  **Not fully verified end-to-end.** `deny-bash-writes.sh`'s own
+  allow/deny logic was tested standalone (piping representative
+  command JSON into it directly) and behaves correctly. But a live
+  dogfood run — invoking `docs-auditor` as a real subagent in this
+  same session, after its frontmatter had just been edited to add the
+  `hooks:` block, and asking it to attempt a write — was **not**
+  blocked; the write succeeded (and was reverted by the agent itself,
+  not by any enforcement). The most likely explanation: this session
+  already had `docs-auditor` registered as a known agent type from
+  earlier use, and Claude Code appears to cache an agent's tool/hook
+  configuration at first discovery rather than re-reading its `.md`
+  file on every invocation within the same session — the same
+  mid-session-edit caching behavior already noted when `docs-auditor`
+  was first dogfooded (a brand-new agent file needed a fresh session
+  to become invocable by name at all). The YAML frontmatter itself
+  parses cleanly and matches the documented subagent-hook syntax
+  exactly, so this is believed to be a same-session staleness
+  artifact, not a syntax error — but "believed" is doing real work in
+  that sentence. A genuinely fresh session (this repo's next Claude
+  Code session, not a subagent spawned mid-session) is needed to
+  confirm the hook actually fires in practice. Until then, treat this
+  as implemented-but-unverified, not confirmed-working.
 
 ## Corrected
 

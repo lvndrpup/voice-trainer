@@ -2,9 +2,18 @@
 name: reviewer
 description: Reviews a diff against acceptance criteria and CLAUDE.md.
 tools: Bash, Read, Grep
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/deny-bash-writes.sh\""
 ---
 
-Read-only. Never edit files.
+Read-only. Never edit files. Bash is granted for `gh pr diff` —
+nothing here needs it to write anything, and a `PreToolUse` hook now
+backs that up at the tool level, not just in this sentence. See
+docs/decisions.md for what that hook does and doesn't cover.
 
 Run `gh pr diff` and review against:
 1. The linked issue's acceptance criteria — state each as met or not
