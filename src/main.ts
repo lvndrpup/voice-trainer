@@ -7,7 +7,7 @@ import { computeLogFrequencyBins } from "./dsp";
 import { SpectrogramRenderer } from "./render";
 import { SessionStore, sessionsToExportJson } from "./store";
 import { readTickFeatures } from "./tick-features";
-import { requireElement } from "./dom";
+import { requireElement, focusIfIdle } from "./dom";
 import { describeCaptureError } from "./describe-capture-error";
 import { initCalibrationWizard } from "./wizard";
 
@@ -130,6 +130,12 @@ async function handleStart(): Promise<void> {
     throw err;
   } finally {
     button.disabled = false;
+    // Disabling the button that was just keyboard-activated drops focus
+    // to <body> with no automatic re-target — restore it (unless the
+    // user has since moved focus elsewhere) rather than stranding a
+    // keyboard/screen-reader user at the top of the document. Surfaced
+    // by an accessibility-tester audit (issue #63).
+    focusIfIdle(button);
   }
 }
 
@@ -175,6 +181,7 @@ async function handleDeleteAll(): Promise<void> {
     throw err;
   } finally {
     deleteAllButton.disabled = false;
+    focusIfIdle(deleteAllButton);
   }
 }
 
@@ -199,6 +206,7 @@ async function handleExport(): Promise<void> {
     throw err;
   } finally {
     exportButton.disabled = false;
+    focusIfIdle(exportButton);
   }
 }
 

@@ -111,14 +111,28 @@ it previously had no accessible name or fallback content at all.
 The same audit pass found three further gaps left open, filed
 separately rather than folded into this fix (out of scope for issue
 #38, which was scoped to the readouts and the canvas label):
-keyboard focus is dropped to `<body>` on every start/stop/delete/export
-action because the just-activated button gets disabled without a
-restore-focus call; below-noise-floor signal renders identically to
-the blank canvas background (`level = 0` for both); and the grayscale
-magnitude-to-brightness mapping's earlier colorblind sign-off checked
-hue-independence but not perceptual linearity, so quiet-end contrast
-may be compressed relative to sRGB's actual response curve
+keyboard focus being dropped to `<body>` on every start/delete/export
+action (issue #63 — **fixed**, see below); below-noise-floor signal
+rendering identically to the blank canvas background (`level = 0` for
+both, issue #64, still open); and the grayscale magnitude-to-brightness
+mapping's earlier colorblind sign-off checking hue-independence but not
+perceptual linearity, so quiet-end contrast may be compressed relative
+to sRGB's actual response curve (issue #65, still open)
 [likely — not independently measured with a contrast-analysis tool].
+
+**Issue #63 fix**: `handleStart()`, `handleDeleteAll()`, and
+`handleExport()` (`src/main.ts`) each disable the button that was just
+clicked at the start of the async operation and re-enable it in a
+`finally` block — disabling drops focus to `<body>` with no automatic
+re-target, and nothing restored it. Each `finally` now also calls
+`focusIfIdle(button)` (`src/dom.ts`) — a small shared guard, not
+`wizard.ts`'s `claimFocusIfNotElsewhere()` (that one also checks
+containment within a hideable panel, which doesn't apply here) —
+restoring focus only if nothing else has claimed it since
+(`document.activeElement` is still `null`/`<body>`), so a user who
+deliberately tabbed elsewhere during the operation doesn't get yanked
+back. `handleStop()` was confirmed (by the original audit) to never
+disable `#mic-toggle` in the first place, so it needed no change.
 
 ## Testing
 
