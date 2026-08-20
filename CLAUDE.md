@@ -108,7 +108,9 @@ docs/documentation-standards.md. Summary:
 Board: GitHub Project "Resonance Scope" (project 1, owner lvndrpup).
 Statuses: Backlog -> Ready -> In Progress -> In Review -> Done.
 Fields: Size (XS/S/M/L), Layer, Started, Finished.
-Milestones = versions from docs/roadmap.md.
+Milestones = versions from docs/roadmap.md, plus one standing
+"Infra & Tooling" milestone for agent-config/process work that isn't
+roadmap-versioned (mirrors docs/ledger.md's Infra & Tooling table).
 
 Rules:
 - WIP limit is 1 in In Progress. Never start a second item.
@@ -116,7 +118,15 @@ Rules:
   don't groom more.
 - An issue is Ready only when it has acceptance criteria, a Size, a
   Layer, and a milestone.
-- Every PR body includes "Closes #N".
+- Every PR needs a linked issue and board item, except direct one-off
+  edits by the user — single-file, a handful of lines, no design
+  decisions (typo/copy fixes, a config value, a version bump, a quick
+  force-push correction). If an agent designed or wrote non-trivial
+  content — a new file, module, doc, or skill/agent — it gets an
+  issue, no matter how small the diff looks. When in doubt, create
+  the issue.
+- Every PR body includes "Closes #N" (the exception above is the only
+  case where a PR may omit it).
 - Use `gh issue` and `gh project item-edit` to read and update the
   board. Never invent issue numbers — list them first.
 - Set Started when moving to In Progress, Finished when moving to Done.
