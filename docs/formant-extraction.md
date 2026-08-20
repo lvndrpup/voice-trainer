@@ -145,7 +145,22 @@ values as fixture ground truth only, never surfaced as coaching
 targets) from a synthetic source-filter vowel — a sawtooth excitation
 through two cascaded resonant IIR filters — at both 44.1kHz and
 48kHz; recovering the same at 16kHz (a capture rate below the
-decimation trigger, exercising the undecimated code path); returning
+decimation trigger, exercising the undecimated code path). All three
+of those fixtures use a centered, `REALISTIC_CAPTURE_WINDOW_SAMPLES`
+(2048)-sample slice of a longer synthesized signal — matching
+`MicrophoneCapture`'s default `AnalyserNode.fftSize`
+([audio-capture.md](./audio-capture.md)), the actual window size
+`estimateFormants` is ever called with in production
+(`src/wizard.ts`) — rather than handing the whole synthesized signal
+to `estimateFormants` directly. An earlier version of this suite did
+the latter (~12× longer than any real capture window, an untested gap
+independent of the high-F0 accuracy question below); switching to the
+realistic window didn't require loosening any existing tolerance —
+verified by direct comparison before the change, not assumed. The
+longer synthesized signal still exists (`synthesizeVowel`'s
+`durationSec` parameter) purely so the excitation/resonator filters
+have time to settle before the window starts, not because the window
+itself needs to be that long. Also returning
 `null` for silence, non-finite input (NaN/Infinity), deterministic
 pseudo-random white noise (a real LPC fit exists, but its peaks don't
 clear the prominence floor), and a pure sine tone (one real

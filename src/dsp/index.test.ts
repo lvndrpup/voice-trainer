@@ -233,10 +233,30 @@ const CORNER_VOWEL_FIXTURES: readonly [string, number, number][] = [
   ["/u/-like", 300, 870],
 ];
 
+/** Matches MicrophoneCapture's default AnalyserNode fftSize
+ * (src/audio/index.ts) — a fixed sample *count*, not a fixed duration, so
+ * it's the same 2048 regardless of capture rate. estimateFormants is only
+ * ever called with a window this size in production (src/wizard.ts); the
+ * corner-vowel fixtures below used to synthesize a full 0.5s window and
+ * hand the whole thing to estimateFormants directly — ~12x longer than
+ * any real call site, an untested gap independent of the high-F0 accuracy
+ * question (see docs/formant-extraction.md's "Known limitations"). Slices
+ * a centered, steady-state window of the real capture size out of the
+ * longer synthetic signal rather than synthesizing a short signal
+ * directly, so the excitation/resonator filters still have time to settle
+ * before the window starts. */
+const REALISTIC_CAPTURE_WINDOW_SAMPLES = 2048;
+
+function realisticCaptureWindow(signal: Float32Array): Float32Array {
+  const length = Math.min(REALISTIC_CAPTURE_WINDOW_SAMPLES, signal.length);
+  const start = Math.floor((signal.length - length) / 2);
+  return signal.slice(start, start + length);
+}
+
 for (const sampleRate of [44100, 48000]) {
   void test(`estimateFormants: recovers corner-vowel-like F1/F2 at ${sampleRate}Hz`, () => {
     for (const [label, f1Hz, f2Hz] of CORNER_VOWEL_FIXTURES) {
-      const signal = synthesizeVowel(150, f1Hz, f2Hz, sampleRate, 0.5);
+      const signal = realisticCaptureWindow(synthesizeVowel(150, f1Hz, f2Hz, sampleRate, 0.5));
       const result = estimateFormants(signal, sampleRate);
       assert.ok(result !== null, `${label}: expected formants, got null`);
       assert.ok(
@@ -266,7 +286,7 @@ void test("estimateFormants: recovers formants at a capture rate below the decim
   // 16kHz is below the default 10kHz target's decimation trigger (factor
   // floor(16000/10000) === 1), so this exercises the undecimated path and
   // the adaptive-lpcOrder scaling that keeps it accurate there too.
-  const signal = synthesizeVowel(150, 500, 1500, 16000, 0.5);
+  const signal = realisticCaptureWindow(synthesizeVowel(150, 500, 1500, 16000, 0.5));
   const result = estimateFormants(signal, 16000);
   assert.ok(result !== null, "expected formants, got null");
   assert.ok(Math.abs(result.f1Hz - 500) < 45, `expected F1 ~500Hz, got ${result.f1Hz.toFixed(1)}`);
