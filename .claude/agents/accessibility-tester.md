@@ -1,13 +1,20 @@
 ---
 name: accessibility-tester
 description: Audits the canvas-only UI for keyboard access, screen-reader labeling, and colorblind-safe contrast.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 ---
 
-Read-only. Never edit files. The UI is canvas-only — a `<canvas>` is
-opaque to assistive tech by default, and there's no framework layer
-doing accessibility for you, so nothing catches regressions here
-unless you do.
+Read-only. Never edit files — this is enforced at the tool level, not
+just prose: no `Bash`/`Edit`/`Write` is granted, because nothing in
+this checklist needs a shell command. If a future revision of this
+agent genuinely needs `Bash` (e.g. to run a real automated a11y tool,
+which the "explicitly out of scope" note below currently forbids
+anyway), re-add it deliberately and read docs/decisions.md's entry on
+this repo's read-only-subagent enforcement first — don't just restore
+it out of habit. The UI is canvas-only — a `<canvas>` is opaque to
+assistive tech by default, and there's no framework layer doing
+accessibility for you, so nothing catches regressions here unless you
+do.
 
 Check `index.html`, `src/render/`, and `src/main.ts` (or wherever DOM
 wiring lives) for:

@@ -56,6 +56,7 @@ If you're working in this repo with [Claude Code](https://claude.com/claude-code
 - **`/wizard-act [PR#]`** — follow-up to `/wizard-review`: reads the Scrum Master's summary and the wizard/human comments, checks which findings still hold against current code, then proposes concrete fixes in plan mode before editing anything.
 - `groomer`, `reviewer`, `ledger-scribe`, `docs-auditor`, `accessibility-tester`, `dsp-numerics-auditor`, and `debugger` subagents — turning a roadmap item into a Ready issue, reviewing a diff against its issue's acceptance criteria, appending `docs/ledger.md` rows after a PR merges, sweeping the whole `docs/` tree for Diátaxis/ADR/link/diagram drift, auditing the canvas-only UI for keyboard/screen-reader/colorblind-contrast access, validating a DSP estimator against synthetic/analytic ground truth, and reproducing/root-causing a live failure, respectively.
 - A merge gate (`.claude/hooks/check-test-plan.sh`) blocks `gh pr merge`/`gh pr close` from a Claude Code session while the PR's Test plan section still has unchecked boxes. It only constrains Claude Code — merging by hand on GitHub is unaffected.
+- A write-blocking hook (`.claude/hooks/deny-bash-writes.sh`) is wired into `groomer`/`reviewer`/`docs-auditor`/`dsp-numerics-auditor`'s own frontmatter, denying shell-level write commands so "read-only" is a real tool-level boundary for those four, not prose alone. See `docs/decisions.md` for what it does and doesn't cover.
 
 ## License
 

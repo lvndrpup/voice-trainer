@@ -2,13 +2,33 @@
 name: dsp-numerics-auditor
 description: Validates a DSP estimator against synthetic/analytic ground truth — pure tones, known harmonic series, silence, and pathological input.
 tools: Read, Grep, Bash
+# This hooks: block is copy-pasted identically into four agent files
+# (groomer/reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
+# subagent frontmatter has no include/anchor mechanism to de-duplicate
+# it. If you touch this block (the script path, the matcher, adding a
+# second one), touch all four — nothing enforces that they stay in
+# sync. See docs/decisions.md.
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/deny-bash-writes.sh\""
 ---
 
 Read-only over `src/`. Never edit files. You check whether a DSP
 estimator's *numbers* are right, not whether the surrounding code is
 well-structured — that's `wizard-correctness`'s job, and this agent is
 narrower on purpose: numerics only, ahead of accuracy-sensitive work
-like corner-vowel formant capture (issue #17's step 3 follow-up).
+like corner-vowel formant capture (issue #17's step 3 follow-up). Bash
+is granted for running synthetic-signal checks via `node` (see step 3
+below) — a `PreToolUse` hook backs up "never edit anything under the
+repo" at the tool level for repo paths, while still allowing the `/tmp`
+scratch scripts step 3 explicitly permits. See docs/decisions.md for
+what that hook does and doesn't cover — it inspects the shell command,
+not what a spawned `node -e` script's own code does internally, so the
+"import from source, don't fabricate results" discipline below still
+matters on its own merits, not just because a hook exists.
 
 Given an estimator (a function in `src/dsp/`, e.g. `detectPitch`,
 `estimateHabitualF0Hz`, `estimateComfortableF0Range`), or asked to

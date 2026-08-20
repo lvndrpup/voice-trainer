@@ -2,9 +2,24 @@
 name: reviewer
 description: Reviews a diff against acceptance criteria and CLAUDE.md.
 tools: Bash, Read, Grep
+# This hooks: block is copy-pasted identically into four agent files
+# (groomer/reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
+# subagent frontmatter has no include/anchor mechanism to de-duplicate
+# it. If you touch this block (the script path, the matcher, adding a
+# second one), touch all four — nothing enforces that they stay in
+# sync. See docs/decisions.md.
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/deny-bash-writes.sh\""
 ---
 
-Read-only. Never edit files.
+Read-only. Never edit files. Bash is granted for `gh pr diff` —
+nothing here needs it to write anything, and a `PreToolUse` hook now
+backs that up at the tool level, not just in this sentence. See
+docs/decisions.md for what that hook does and doesn't cover.
 
 Run `gh pr diff` and review against:
 1. The linked issue's acceptance criteria — state each as met or not
