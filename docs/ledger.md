@@ -68,6 +68,8 @@ can't be part of the PR it's documenting. After a PR merges:
 | Version | Issue | PR | Commit | What shipped |
 |---|---|---|---|---|
 | v0.3 | #17 | #18 | `f686930` | Calibration step-sequencing engine (steps 0/1/2/4/5) + CalibrationStore; SessionStore split into idb.ts |
+| v0.3 | #43 | #45 | `7dba395` | LPC-based `estimateFormants` (F1/F2 extraction) added to `src/dsp` |
+| v0.3 | #44 | #47 | `1849d65` | Corner-vowel (3-step) formant capture wired into CalibrationEngine; CALIBRATION_SCHEMA_VERSION bumped to 2 |
 
 ## Infra & Tooling
 
@@ -86,6 +88,10 @@ applies.
 | #24 | `87a3952` | `groomer`, `reviewer`, `ledger-scribe` subagent definitions added |
 | #28 | `8b37609` | `/wizard-act` skill added — reconciles `/wizard-review` findings against current code, gates edits behind plan-mode approval |
 | #30 | `8668458` | Repo-wide PR tracking-bar policy (linked issue + board item required) codified in CLAUDE.md; standing Infra & Tooling milestone added |
+| #37 | `fea5f3a` | `docs-auditor` subagent added — sweeps `docs/` for Diátaxis mode-mixing, ADR-immutability violations, dead links, stale diagrams |
+| #42 | `d1d2307` | `debugger` subagent added — reproduces and root-causes a live failure, report-only, never applies a fix |
+| #39 | `914d853` | `accessibility-tester` subagent added — audits canvas UI for keyboard access, screen-reader labeling, colorblind-safe contrast |
+| #40 | `5ea184e` | `dsp-numerics-auditor` subagent added — validates DSP estimators against synthetic/analytic ground truth |
 
 ## History (pre-dates this file)
 
