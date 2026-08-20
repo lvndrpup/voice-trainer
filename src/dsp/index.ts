@@ -253,16 +253,18 @@ export interface FormantExtractionOptions {
  * ripple, not real resonances, which `minPeakProminenceDb` exists to
  * reject rather than reporting them as confident formants.
  *
- * Decimates to `2 * maxFormantHz` (10kHz at the default 5000Hz) before
- * analysis, mirroring standard formant-analysis practice (e.g. Praat):
- * running LPC directly at a raw 44.1k/48k capture rate would need a much
- * higher predictor order to span that bandwidth, most of which is
- * irrelevant to F1/F2, and produces a wigglier envelope more prone to
- * spurious peaks. Decimating first means `lpcOrder`'s default (12) is a
- * fixed value tuned to the working rate rather than the raw one — capture
- * rate stops mattering at all once the signal is downsampled, which is a
- * cleaner way to avoid the "misbehaves at 44.1k vs 48k" failure mode than
- * scaling the order to the raw rate would be. See docs/formant-extraction.md.
+ * Decimates by an integer factor toward `2 * maxFormantHz` (10kHz at the
+ * default 5000Hz) before analysis, mirroring standard formant-analysis
+ * practice (e.g. Praat): running LPC directly at a raw 44.1k/48k capture
+ * rate would need a much higher predictor order to span that bandwidth,
+ * most of which is irrelevant to F1/F2, and produces a wigglier envelope
+ * more prone to spurious peaks. Because the factor is an integer, the
+ * working rate only approaches the target and varies by capture rate
+ * (e.g. 11025Hz at 44.1kHz vs 12000Hz at 48kHz; a rate at or below the
+ * target isn't decimated at all) — `lpcOrder` therefore scales with the
+ * *actual* working rate rather than being a fixed constant, which is
+ * what keeps behavior comparable across capture rates, not a claim that
+ * decimation makes them literally equivalent. See docs/formant-extraction.md.
  *
  * Peak-picking (scan the envelope, take local maxima) was chosen over
  * polynomial root-finding for the LPC denominator: root-finding is more
@@ -280,7 +282,6 @@ export function estimateFormants(
 ): Formants | null {
   const minFormantHz = options.minFormantHz ?? 150;
   const maxFormantHz = options.maxFormantHz ?? 5000;
-  const lpcOrder = options.lpcOrder ?? 12;
   const minPeakSeparationHz = options.minPeakSeparationHz ?? 150;
   const minPeakProminenceDb = options.minPeakProminenceDb ?? 3;
 
@@ -293,20 +294,34 @@ export function estimateFormants(
   if (!(minFormantHz > 0) || !(maxFormantHz > minFormantHz)) {
     throw new Error("minFormantHz must be > 0 and less than maxFormantHz.");
   }
-  if (!Number.isInteger(lpcOrder) || lpcOrder < 2) {
+  if (options.lpcOrder !== undefined && (!Number.isInteger(options.lpcOrder) || options.lpcOrder < 2)) {
     throw new Error("lpcOrder must be an integer >= 2.");
   }
 
   let totalEnergy = 0;
   for (const sample of samples) {
+    if (!Number.isFinite(sample)) {
+      return null; // non-finite input — never a misleading number
+    }
     totalEnergy += sample * sample;
   }
   if (totalEnergy === 0) {
     return null; // silence
   }
 
+  // Decimation is by an integer factor, so the working rate only ever
+  // *approaches* 2*maxFormantHz — it varies by capture rate (e.g. 11025Hz
+  // at 44.1kHz vs 12000Hz at 48kHz, both decimate-by-4; a capture rate at
+  // or below the target, e.g. 16kHz, isn't decimated at all and keeps its
+  // own rate). lpcOrder therefore scales with the *actual* working rate
+  // rather than being a fixed constant, so it still tracks bandwidth
+  // reasonably across that range — this is what actually satisfies "don't
+  // misbehave across different capture rates," not an unqualified claim
+  // that decimation makes every capture rate literally equivalent. See
+  // docs/formant-extraction.md.
   const targetRateHz = 2 * maxFormantHz;
   const { samples: working, sampleRate: workingRate } = decimate(samples, sampleRate, targetRateHz);
+  const lpcOrder = options.lpcOrder ?? Math.round(workingRate / 1000) + 4;
   if (working.length <= lpcOrder) {
     throw new Error(
       `samples must contain more than lpcOrder (${lpcOrder}) samples after decimation; ` +

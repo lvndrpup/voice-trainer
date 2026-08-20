@@ -35,19 +35,28 @@ graph LR
 would need a much higher predictor order to span that bandwidth, most
 of which is irrelevant to F1/F2 — and a higher order makes the
 resulting spectral envelope wigglier and more prone to spurious
-peaks. `estimateFormants` decimates to `2 * maxFormantHz` (10kHz at
-the default `maxFormantHz` of 5000Hz) before doing anything else,
-mirroring standard formant-analysis practice (e.g. Praat resamples to
-twice its "maximum formant" parameter for the same reason). A
-side-effect worth naming explicitly: this also means `lpcOrder`'s
-default (12) is a **fixed** value tuned to the working rate, not the
-raw capture rate — 44.1k and 48k captures produce the same working
-rate after decimation, so the estimator behaves identically at either,
-without needing to scale the order to the input rate at all. The
-decimation filter itself is a windowed-sinc (Hamming-windowed) lowpass
-FIR, applied before subsampling to anti-alias; it's a no-op (beyond a
-type conversion) when the input is already at or below the target
-rate, e.g. a low-rate synthetic test signal.
+peaks. `estimateFormants` decimates by an **integer factor** toward
+`2 * maxFormantHz` (10kHz at the default `maxFormantHz` of 5000Hz)
+before doing anything else, mirroring standard formant-analysis
+practice (e.g. Praat resamples toward twice its "maximum formant"
+parameter for the same reason). Because the factor is an integer
+(`floor(sampleRate / targetRateHz)`), the resulting working rate only
+*approaches* the target, and varies by capture rate — 44.1kHz and
+48kHz both decimate by 4, landing at 11025Hz and 12000Hz respectively
+(close, not identical), and a capture rate at or below the target
+(e.g. a 16kHz mic) isn't decimated at all, keeping its own rate
+outright. `lpcOrder` therefore scales with the **actual working
+rate** (`round(workingRate / 1000) + 4`, unless overridden) rather
+than being a fixed constant — this is what keeps accuracy comparable
+across capture rates in practice, not a claim that decimation makes
+every rate literally equivalent. (An earlier version of this function
+used a single hardcoded default order and claimed the working rate
+was rate-independent; both were wrong, caught by an independent
+numerics audit before merge — see "Testing" below for the real
+per-rate accuracy figures.) The decimation filter itself is a
+windowed-sinc (Hamming-windowed) lowpass FIR, applied before
+subsampling to anti-alias; it's a no-op (beyond a type conversion)
+when the input is already at or below the target rate.
 
 **Pre-emphasis** (`y[n] = x[n] - 0.97*x[n-1]`) flattens voiced
 speech's natural -6dB/octave spectral tilt, so LPC spends its poles
@@ -94,7 +103,23 @@ happened to split into two nearby local maxima, not two real formants.
 **Known simplification**: this is prominence and separation only, not
 the pole-bandwidth-based confidence a real formant tracker would also
 weigh — acceptable for now, revisit if it produces bad results on real
-recordings (see "Testing" below).
+recordings (see "Testing" below). `minPeakSeparationHz` is a safety
+net for peaks the envelope resolved as two nearby local maxima, not a
+fix for peaks it never resolved as two maxima at all: at the default
+`lpcOrder`, two true resonances closer than roughly 150-300Hz apart
+can show up as a *single* local maximum in the envelope, in which case
+lowering `minPeakSeparationHz` does nothing — there's only one
+candidate peak to begin with, not two close ones to un-collapse. A
+higher `lpcOrder` can resolve them (confirmed in testing: order 20 vs
+the ~15 the default formula picks at a typical working rate correctly
+separated a synthetic 500Hz/620Hz pair), but raising the default
+wasn't adopted here without re-validating the prominence-filter edge
+cases (white noise, a pure tone) at that higher order, which is out of
+this issue's scope. This matters concretely for the corner-vowel
+calibration step this feeds into: back/rounded vowels like /u/ often
+have F1/F2 closer together than front vowels, so a legitimate /u/
+could plausibly return `null` indistinguishably from "no voice
+detected" — flagged to whoever wires that step.
 
 `minFormantHz`/`maxFormantHz` (default 150-5000Hz) bound the peak
 search — the physically plausible F1/F2 range across adult speech in
@@ -115,13 +140,15 @@ F1/F2 pairs (`/i/`-, `/a/`-, `/u/`-like, using [Peterson & Barney
 (1952)](https://doi.org/10.1121/1.1906875)-adjacent adult formant
 values as fixture ground truth only, never surfaced as coaching
 targets) from a synthetic source-filter vowel — a sawtooth excitation
-through two cascaded resonant IIR filters — at both 44.1kHz and 48kHz
-to confirm decimation makes the result sample-rate-independent;
-silence → null; deterministic pseudo-random white noise → null (a
-real LPC fit exists, but its peaks don't clear the prominence floor);
-a pure sine tone → null (one real resonance, no meaningful second
-formant); a window too short for the chosen `lpcOrder` after
-decimation → throws; and invalid option combinations → throws.
+through two cascaded resonant IIR filters — at both 44.1kHz and
+48kHz; recovering the same at 16kHz (a capture rate below the
+decimation trigger, exercising the undecimated code path); returning
+`null` for silence, non-finite input (NaN/Infinity), deterministic
+pseudo-random white noise (a real LPC fit exists, but its peaks don't
+clear the prominence floor), and a pure sine tone (one real
+resonance, no meaningful second formant); throwing for a window too
+short for the chosen `lpcOrder` after decimation, and for invalid
+option combinations.
 
 As with `detectPitch`, these are synthetic self-consistency tests
 against a hand-built source-filter model, not golden-file comparisons
@@ -135,10 +162,39 @@ model is a crude approximation of a real vocal tract — it produces
 formant-shaped spectral peaks at the target frequencies, nothing more
 — so passing these tests demonstrates the LPC/peak-picking pipeline
 recovers formants from a signal that plausibly has them, not that it's
-accurate on a real, messy recording (harmonics-to-formant interaction,
-breathiness, mic-response coloration, a vocal tract that isn't a
-cascade of two ideal resonators). **This hasn't been validated against
-real voice at all.** Real-recording validation, and the small-but-real
-systematic bias visible even against the synthetic fixtures (a few
-percent, consistent between the two tested sample rates) are open
-follow-ups, not settled here.
+accurate on a real, messy recording. **This hasn't been validated
+against real voice at all.**
+
+### Known limitations (quantified, not glossed over)
+
+An independent numerics audit of this PR (different F1/F2 pairs,
+different excitation model, and harder edge cases than the committed
+test suite — see the PR discussion) found the committed tests' own
+tolerances (±40Hz F1 / ±60Hz F2) don't characterize the estimator's
+real behavior outside the specific fixtures they use. Two real,
+unresolved failure modes, both directly relevant to this app's actual
+use case:
+
+- **Harmonics-to-formant interaction gets worse, not better, at
+  higher F0.** Peak-picking can lock onto a harmonic near the true
+  resonance instead of the resonance itself, and the effect is
+  *non-monotonic* — it depends on how the F0-spaced harmonic grid
+  happens to sit relative to the true formant, not on F1 magnitude
+  alone. The original version of this doc characterized the bias as
+  "a few percent," based only on a single low F0 (150Hz) across three
+  fixtures. Audit testing at F0 in the 220-350Hz range — squarely
+  within plausible feminization-training targets — found F1 errors
+  from roughly 12% up to over 25%, and in one case a wrong second
+  peak entirely (F2 off by ~49%). This is a known, real limitation of
+  naive peak-picked LPC at high F0 relative to formant bandwidth, not
+  something this implementation does uniquely wrong — proper fixes
+  (pitch-synchronous analysis, cepstral liftering, or similar) are a
+  different algorithm, out of scope here. Tracked as its own backlog
+  item given how directly it bears on this app's target users.
+- **Closely-spaced formants can resolve as a single peak and return
+  `null`**, not a degraded-but-present estimate — see "Prominence
+  filtering" above. Concretely relevant to /u/-like vowels in the
+  corner-vowel calibration step this feeds into.
+
+Real-recording validation, and both limitations above, are open
+follow-ups, not settled by this PR.

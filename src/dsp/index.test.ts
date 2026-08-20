@@ -255,6 +255,24 @@ void test("estimateFormants: returns null for silence", () => {
   assert.equal(estimateFormants(new Float32Array(4096), 48000), null);
 });
 
+void test("estimateFormants: returns null for non-finite input (NaN/Infinity)", () => {
+  assert.equal(estimateFormants(new Float32Array(4096).fill(NaN), 48000), null);
+  const withInfinity = new Float32Array(4096);
+  withInfinity[100] = Infinity;
+  assert.equal(estimateFormants(withInfinity, 48000), null);
+});
+
+void test("estimateFormants: recovers formants at a capture rate below the decimation target (no decimation applied)", () => {
+  // 16kHz is below the default 10kHz target's decimation trigger (factor
+  // floor(16000/10000) === 1), so this exercises the undecimated path and
+  // the adaptive-lpcOrder scaling that keeps it accurate there too.
+  const signal = synthesizeVowel(150, 500, 1500, 16000, 0.5);
+  const result = estimateFormants(signal, 16000);
+  assert.ok(result !== null, "expected formants, got null");
+  assert.ok(Math.abs(result.f1Hz - 500) < 45, `expected F1 ~500Hz, got ${result.f1Hz.toFixed(1)}`);
+  assert.ok(Math.abs(result.f2Hz - 1500) < 70, `expected F2 ~1500Hz, got ${result.f2Hz.toFixed(1)}`);
+});
+
 void test("estimateFormants: returns null for white noise (no real resonance, just LPC ripple)", () => {
   const samples = new Float32Array(4096);
   let seed = 42;
