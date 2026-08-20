@@ -70,6 +70,7 @@ can't be part of the PR it's documenting. After a PR merges:
 | v0.3 | #17 | #18 | `f686930` | Calibration step-sequencing engine (steps 0/1/2/4/5) + CalibrationStore; SessionStore split into idb.ts |
 | v0.3 | #43 | #45 | `7dba395` | LPC-based `estimateFormants` (F1/F2 extraction) added to `src/dsp` |
 | v0.3 | #44 | #47 | `1849d65` | Corner-vowel (3-step) formant capture wired into CalibrationEngine; CALIBRATION_SCHEMA_VERSION bumped to 2 |
+| v0.3 | #53 | #59 | `7a5a1db` | Wizard now persists raw per-step readings into `calibrationFrames` instead of an empty map |
 
 ## Infra & Tooling
 
