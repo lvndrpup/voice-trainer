@@ -84,6 +84,8 @@ applies.
 | #22 | `56eae32` | `wizard-scrummaster` agent added to close out `/wizard-review` |
 | #23 | `e955597` | Fixed scrummaster's tool grant and a stale step-6 doc pointer |
 | #24 | `87a3952` | `groomer`, `reviewer`, `ledger-scribe` subagent definitions added |
+| #28 | `8b37609` | `/wizard-act` skill added — reconciles `/wizard-review` findings against current code, gates edits behind plan-mode approval |
+| #30 | `8668458` | Repo-wide PR tracking-bar policy (linked issue + board item required) codified in CLAUDE.md; standing Infra & Tooling milestone added |
 
 ## History (pre-dates this file)
 
