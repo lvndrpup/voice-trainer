@@ -23,15 +23,12 @@ for what's actually scheduled.
 
 Candidate `.claude/agents/*.md` beyond the existing wizard-review
 persona set (correctness/security/simplicity/performance, reviews
-PRs) and the shipped `groomer`, `reviewer`, `ledger-scribe`, and
-`docs-auditor` subagents. Parked here rather than filed as issues
-since these are dev tooling, not versioned product scope — pick one,
-and it graduates straight to a drafted agent file, no milestone
-needed.
+PRs) and the shipped `groomer`, `reviewer`, `ledger-scribe`,
+`docs-auditor`, and `debugger` subagents. Parked here rather than
+filed as issues since these are dev tooling, not versioned product
+scope — pick one, and it graduates straight to a drafted agent file,
+no milestone needed.
 
-- **debugger** — reproduces and root-causes a *live* failure (a flaky
-  Playwright run, a spectrogram artifact), distinct from `reviewer`'s
-  diff-vs-criteria job.
 - **accessibility-tester** — canvas-only UI: keyboard access to
   start/stop, screen-reader labeling, colorblind-safe grayscale
   (already flagged as a "revisit" in [spectrogram.md](./spectrogram.md)).
