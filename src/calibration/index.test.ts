@@ -6,17 +6,34 @@ import {
   STEP_ORDER,
   STEP_PROMPTS,
   type StepReading,
+  type FormantStepReading,
   type NonFormantStepId,
+  type CornerVowelStepId,
+  type StepId,
 } from "./index.ts";
+import type { Formants } from "../dsp/index.ts";
 
 function readings(f0Values: readonly (number | null)[], levelDb = -20): StepReading[] {
   return f0Values.map((f0Hz) => ({ levelDb, f0Hz }));
 }
 
+function formantReadings(
+  formants: readonly (Formants | null)[],
+  levelDb = -20,
+): FormantStepReading[] {
+  return formants.map((f) => ({ levelDb, formants: f }));
+}
+
+const PLAUSIBLE_FORMANTS: Formants = { f1Hz: 300, f2Hz: 2000 };
+
 /** Submits every step with plausible, validity-passing readings, so
  * tests that only care about one step's behavior don't have to repeat
  * the whole sequence. */
-function completeAllSteps(engine: CalibrationEngine, overrides: Partial<Record<NonFormantStepId, StepReading[]>> = {}): void {
+function completeAllSteps(
+  engine: CalibrationEngine,
+  overrides: Partial<Record<NonFormantStepId, StepReading[]>> = {},
+  cornerOverrides: Partial<Record<CornerVowelStepId, FormantStepReading[]>> = {},
+): void {
   const defaults: Record<NonFormantStepId, StepReading[]> = {
     0: readings([null, null, null], -60),
     1: readings([200, 201, 199, 200], -20),
@@ -24,19 +41,28 @@ function completeAllSteps(engine: CalibrationEngine, overrides: Partial<Record<N
     4: readings([300, 305], -20),
     5: readings([150, 200, 320, 180], -20),
   };
+  const cornerDefaults: Record<CornerVowelStepId, FormantStepReading[]> = {
+    "corner-i": formantReadings([PLAUSIBLE_FORMANTS, PLAUSIBLE_FORMANTS]),
+    "corner-a": formantReadings([PLAUSIBLE_FORMANTS, PLAUSIBLE_FORMANTS]),
+    "corner-u": formantReadings([PLAUSIBLE_FORMANTS, PLAUSIBLE_FORMANTS]),
+  };
   for (const stepId of STEP_ORDER) {
     engine.beginStep(stepId);
-    engine.submitStep(overrides[stepId] ?? defaults[stepId]);
+    if (typeof stepId === "number") {
+      engine.submitStep(overrides[stepId] ?? defaults[stepId]);
+    } else {
+      engine.submitStep(cornerOverrides[stepId] ?? cornerDefaults[stepId]);
+    }
   }
 }
 
-void test("STEP_PROMPTS: covers exactly steps 0, 1, 2, 4, 5, in that order", () => {
+void test("STEP_PROMPTS: covers all 8 engine steps, corner vowels between steps 2 and 4, in that order", () => {
   // STEP_ORDER is derived from STEP_PROMPTS, so this is the one place
   // that needs to check the actual content — STEP_ORDER can't drift
   // from it independently.
   assert.deepEqual(
     STEP_PROMPTS.map((p) => p.id),
-    [0, 1, 2, 4, 5],
+    [0, 1, 2, "corner-i", "corner-a", "corner-u", 4, 5],
   );
   assert.deepEqual(STEP_ORDER, STEP_PROMPTS.map((p) => p.id));
 });
@@ -61,7 +87,9 @@ void test("CalibrationEngine: beginStep rejects an unknown step id", () => {
   const engine = new CalibrationEngine(null);
   assert.throws(
     () => {
-      engine.beginStep(3 as unknown as NonFormantStepId); // step 3 doesn't exist yet — see module header
+      // Numeric 3 was never a valid id — corner vowels use string ids
+      // (corner-i/corner-a/corner-u), not a numeric step 3.
+      engine.beginStep(3 as unknown as StepId);
     },
     CalibrationEngineError,
   );
@@ -72,12 +100,20 @@ void test("CalibrationEngine: isComplete is false until every step is submitted,
   assert.equal(engine.isComplete(), false);
   for (const stepId of STEP_ORDER.slice(0, -1)) {
     engine.beginStep(stepId);
-    engine.submitStep(readings([200]));
+    if (typeof stepId === "number") {
+      engine.submitStep(readings([200]));
+    } else {
+      engine.submitStep(formantReadings([PLAUSIBLE_FORMANTS]));
+    }
   }
   assert.equal(engine.isComplete(), false);
   const lastStep = STEP_ORDER[STEP_ORDER.length - 1];
   engine.beginStep(lastStep);
-  engine.submitStep(readings([200]));
+  if (typeof lastStep === "number") {
+    engine.submitStep(readings([200]));
+  } else {
+    engine.submitStep(formantReadings([PLAUSIBLE_FORMANTS]));
+  }
   assert.equal(engine.isComplete(), true);
 });
 
@@ -107,19 +143,121 @@ void test("CalibrationEngine: submitStep returns null for steps 4 and 5 (no chec
 
 void test("CalibrationEngine: buildDraft aggregates each field from the right step", () => {
   const engine = new CalibrationEngine("device-abc");
-  completeAllSteps(engine, {
-    0: readings([null, null], -60),
-    1: readings([200, 202, 198], -18),
-    2: readings([148, null, 152, 150], -20),
-    4: readings([300, 310], -20),
-    5: readings([150, 200, 320, 180], -20),
-  });
+  completeAllSteps(
+    engine,
+    {
+      0: readings([null, null], -60),
+      1: readings([200, 202, 198], -18),
+      2: readings([148, null, 152, 150], -20),
+      4: readings([300, 310], -20),
+      5: readings([150, 200, 320, 180], -20),
+    },
+    {
+      "corner-i": formantReadings([{ f1Hz: 270, f2Hz: 2290 }, { f1Hz: 280, f2Hz: 2270 }]),
+      "corner-a": formantReadings([{ f1Hz: 730, f2Hz: 1090 }]),
+      "corner-u": formantReadings([{ f1Hz: 300, f2Hz: 870 }, null, { f1Hz: 310, f2Hz: 850 }]),
+    },
+  );
   const draft = engine.buildDraft();
   assert.equal(draft.deviceId, "device-abc");
   assert.equal(draft.noiseFloorDb, -60);
   assert.equal(draft.levelReferenceDb, -18);
   assert.equal(draft.habitualF0Hz, 150);
   assert.deepEqual(draft.comfortableF0Range, [150, 320]);
+  assert.deepEqual(draft.cornerVowels, {
+    i: { f1Hz: 275, f2Hz: 2280 },
+    a: { f1Hz: 730, f2Hz: 1090 },
+    u: { f1Hz: 305, f2Hz: 860 },
+  });
+});
+
+void test("CalibrationEngine: buildDraft's cornerVowels is null if any vowel never produced formants", () => {
+  const engine = new CalibrationEngine(null);
+  completeAllSteps(engine, {}, {
+    "corner-i": formantReadings([null, null]), // no confident formant reading at all
+  });
+  const draft = engine.buildDraft();
+  assert.equal(draft.cornerVowels, null);
+});
+
+void test("CalibrationEngine: corner-vowel validity check fails when most readings have no formants", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep("corner-i");
+  const check = engine.submitStep(
+    formantReadings([null, null, null, PLAUSIBLE_FORMANTS]),
+  );
+  assert.ok(check);
+  assert.equal(check.id, "corner-vowel-i");
+  assert.equal(check.passed, false);
+});
+
+void test("CalibrationEngine: corner-vowel validity check passes when most readings have formants", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep("corner-a");
+  const check = engine.submitStep(
+    formantReadings([PLAUSIBLE_FORMANTS, PLAUSIBLE_FORMANTS, null]),
+  );
+  assert.ok(check);
+  assert.equal(check.id, "corner-vowel-a");
+  assert.equal(check.passed, true);
+});
+
+void test("CalibrationEngine: redoStep on one corner-vowel step doesn't affect the other two", () => {
+  const engine = new CalibrationEngine(null);
+  completeAllSteps(engine);
+  assert.equal(engine.isComplete(), true);
+  engine.redoStep("corner-u");
+  assert.equal(engine.isComplete(), false);
+  assert.notEqual(engine.getStepReadings("corner-i"), null);
+  assert.notEqual(engine.getStepReadings("corner-a"), null);
+  assert.equal(engine.getStepReadings("corner-u"), null);
+  engine.beginStep("corner-u");
+  engine.submitStep(formantReadings([PLAUSIBLE_FORMANTS, PLAUSIBLE_FORMANTS]));
+  assert.equal(engine.isComplete(), true);
+});
+
+void test("CalibrationEngine: submitStep throws on StepReading submitted for a corner-vowel step", () => {
+  // Regression test: without the shape guard, StepReading's f0Hz field
+  // is absent from FormantStepReading, so a corner-vowel step's check
+  // read `reading.formants` (undefined) and compared `undefined !== null`
+  // (true) — every wrong-shaped reading silently counted as "voiced,"
+  // reporting a false-positive pass instead of failing loudly here.
+  const engine = new CalibrationEngine(null);
+  engine.beginStep("corner-i");
+  assert.throws(() => {
+    engine.submitStep(readings([200, 201]));
+  }, CalibrationEngineError);
+});
+
+void test("CalibrationEngine: submitStep throws on FormantStepReading submitted for a non-formant step", () => {
+  const engine = new CalibrationEngine(null);
+  engine.beginStep(2);
+  assert.throws(() => {
+    engine.submitStep(formantReadings([PLAUSIBLE_FORMANTS]));
+  }, CalibrationEngineError);
+});
+
+void test("CalibrationEngine: a formants:undefined reading (key present, value malformed) is treated as unvoiced through to buildDraft, not a crash", () => {
+  // submitStep's shape guard only checks that the `formants` key
+  // exists, not that its value is well-typed -- a residual gap a
+  // wizard-correctness review found even after that guard landed
+  // (repro: buildDraft() throwing "Cannot read properties of
+  // undefined" while medianing a formants value that was never
+  // actually a Formants). Fixed downstream instead: `formants != null`
+  // (not `!== null`) treats undefined the same as null rather than
+  // counting it as a confident reading, in both the validity check and
+  // the aggregation buildDraft() relies on.
+  const engine = new CalibrationEngine(null);
+  const malformed = [
+    { levelDb: -20, formants: undefined } as unknown as FormantStepReading,
+    { levelDb: -20, formants: PLAUSIBLE_FORMANTS },
+  ];
+  completeAllSteps(engine, {}, { "corner-i": malformed });
+  assert.doesNotThrow(() => engine.buildDraft());
+  const draft = engine.buildDraft();
+  // Only the one well-formed reading was voiced, so the median is just
+  // that reading's own values, not corrupted by the malformed one.
+  assert.deepEqual(draft.cornerVowels?.i, PLAUSIBLE_FORMANTS);
 });
 
 void test("CalibrationEngine: noise-floor check fails when step 0's level is above threshold", () => {
@@ -192,6 +330,17 @@ void test("CalibrationEngine: buildDraft's validity.valid is false if any of ste
   assert.equal(draft.validity.valid, false);
   assert.equal(
     draft.validity.checks.some((c) => c.id === "noise-floor" && !c.passed),
+    true,
+  );
+});
+
+void test("CalibrationEngine: buildDraft's validity.valid is also false if a corner-vowel step failed", () => {
+  const engine = new CalibrationEngine(null);
+  completeAllSteps(engine, {}, { "corner-a": formantReadings([null, null, null]) });
+  const draft = engine.buildDraft();
+  assert.equal(draft.validity.valid, false);
+  assert.equal(
+    draft.validity.checks.some((c) => c.id === "corner-vowel-a" && !c.passed),
     true,
   );
 });

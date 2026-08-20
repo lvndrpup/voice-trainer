@@ -163,6 +163,52 @@ for now," not "settled forever."
   implementations either" — a wizard button a user could open but
   never complete would be exactly that, so the whole wizard ships in
   one PR once step 3 exists, atomically.
+- Step 3 (corner-vowel formants) now has a producer too:
+  `CalibrationEngine` (`src/calibration/index.ts`) gained three
+  engine steps, `corner-i`/`corner-a`/`corner-u`, one per vowel rather
+  than one step with a three-item reading list — chosen so each vowel
+  redoes independently (a bad `/i/` shouldn't force redoing `/a/` and
+  `/u/`), and because `STEP_PROMPTS`/`STEP_ORDER` was already
+  one-prompt-per-id, so this fits that shape without inventing a
+  sub-phase concept. `NonFormantStepId` (0|1|2|4|5) keeps its name —
+  still accurate, those five steps still don't use formants — but a
+  new `StepId = NonFormantStepId | CornerVowelStepId` union now
+  covers the full 8-engine-step space; `STEP_PROMPTS`, `STEP_ORDER`,
+  `beginStep`/`redoStep`, and (as anticipated) `src/store/
+  calibration.ts`'s `CalibrationStepFrame.stepId` all widened to it.
+  `CalibrationStepFrame` also gained a `formants` field alongside the
+  existing `f0Hz` (each null when not applicable to that step) —
+  `CALIBRATION_SCHEMA_VERSION` bumped 1 → 2, additive, existing
+  records unaffected. The corner-vowel validity check reuses step 2's
+  voiced-ratio shape (did most readings produce *a* formant) rather
+  than checking the resulting F1/F2 values against any expected
+  per-vowel range — the latter would be a hardcoded formant target,
+  which CLAUDE.md forbids outright; `estimateFormants` already bounds
+  its own output to a broad plausible range and returns `null` rather
+  than an implausible value, so that's where "formants outside
+  physiological bounds" (calibration.md's validity-check list) is
+  actually enforced. `beginStep()` still doesn't enforce step order —
+  confirmed unchanged, not an accidental side effect of adding three
+  more valid step ids. Wizard UI wiring remains deferred, per the
+  entry above — this PR is the data-layer half only. A
+  `wizard-correctness` review before merge caught a real bug in the
+  first version: `submitStep` accepted either reading shape for any
+  step with no check that it matched the step just begun, and because
+  `StepReading`/`FormantStepReading` don't share a field name, a
+  wrong-shaped submission didn't fail at the call site — it silently
+  reported a false-positive "clear reading," then crashed later, in
+  `buildDraft()`, somewhere that wouldn't obviously point back to the
+  actual mistake. Fixed: `submitStep` now checks each reading's shape
+  against the step's family and throws immediately on a mismatch,
+  same "surfaced not swallowed" bar the rest of this module already
+  holds to. Not reachable in production today (no caller exists yet),
+  but cheap to fix before one does. A related, lower-severity gap
+  noted but not fixed here: schemaVersion-1 `CalibrationStepFrame`
+  records genuinely lack a `formants` key at all (not `formants:
+  null`) — a future reader trusting the type as written would get
+  `undefined` from old records, not `null`. Unreachable today (no
+  reader exists), worth a guard whenever `getCalibrationFrames` gets
+  a consumer, not built speculatively now.
 
 ## Decided — process
 

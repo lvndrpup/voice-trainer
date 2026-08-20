@@ -14,6 +14,18 @@ roughly 90 seconds. Order matters — no range tasks on a cold voice.
 | 4 | "Say hiii like you're greeting a dog" | 2s | Top of comfortable range, in greeting register |
 | 5 | "Hum a slide up, then down — stop wherever it stops feeling easy" | 8s | Comfortable range |
 
+This table is the user-facing protocol — from the user's perspective,
+step 3 is one task, three quick vowel prompts back to back.
+`CalibrationEngine` (`src/calibration/index.ts`) implements it as
+**three separate engine steps** (`corner-i`/`corner-a`/`corner-u`,
+one per vowel) rather than one step carrying a three-item reading
+list, so each vowel gets its own independent one-tap redo — a bad
+`/i/` shouldn't force redoing `/a/` and `/u/` too. `STEP_ORDER` places
+them between steps 2 and 4, matching this table, but `beginStep()`
+itself still doesn't enforce that ordering (confirmed unchanged when
+the corner-vowel steps were added — any not-yet-submitted step may
+begin at any time; only one step may be in progress at once).
+
 ## Design rationale
 
 - Step 4 replaces the maximum-pitch task used by consumer singing apps.
@@ -75,6 +87,17 @@ wrong and offer to redo that one step.
 Checks: noise floor above threshold, insufficient voiced frames,
 implausible F0 variance, formants outside physiological bounds, level
 far from the session-1 reference.
+
+"Formants outside physiological bounds" is implemented at the DSP
+layer, not as a separate per-vowel check here: `estimateFormants`
+(`src/dsp`) already bounds its own output to a broad plausible range
+and returns `null` rather than an implausible value — the corner-
+vowel steps' validity check is "did most readings produce a formant
+at all" (same shape as step 2's voiced-ratio check), not a check
+against expected per-vowel frequencies. CLAUDE.md forbids hardcoding
+frequency/formant targets anywhere in `src/`, which a per-vowel
+expected-range check would be — see `docs/formant-extraction.md` and
+`docs/decisions.md`.
 
 Rationale: a bad calibration fails silently and poisons every target
 for months — someone whispers because a roommate is asleep, or holds

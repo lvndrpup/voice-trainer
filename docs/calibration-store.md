@@ -30,7 +30,7 @@ interface Calibration {
   levelReferenceDb: number | null;
   habitualF0Hz: number | null;
   comfortableF0Range: [number, number] | null;
-  cornerVowels: CornerVowelFormants | null;  // null until step 3 lands
+  cornerVowels: CornerVowelFormants | null;  // null if any vowel had no confident reading
   validity: ValidityReport;            // imported from src/calibration
 }
 ```
@@ -49,11 +49,14 @@ documented interface (a separate, functional gap — raw frame storage
   primary key — IndexedDB needs a `keyPath` to store records at all, so
   one was added, mirroring `Session.id`.
 
-`cornerVowels` is `null` in every record this store can currently
-produce — nothing in `src/` yet extracts corner-vowel formants (step 3
-needs LPC, deferred to a follow-up PR with its own golden-file
-fixtures). The field exists now so the schema doesn't need a version
-bump when step 3 lands; only its nullability goes away.
+`cornerVowels` now has a producer — `CalibrationEngine.buildDraft()`
+(`src/calibration`) populates it from the three corner-vowel steps'
+formant readings, `null` only if any of the three vowels never
+produced a confident formant. Nothing in `src/` calls `buildDraft()`
+in production yet, though — the wizard UI wiring (`index.html`/
+`main.ts`) that would actually drive a calibration attempt through
+this store is a separate, still-pending follow-up (calibration.md's
+`decisions.md` entry on step 3).
 
 ## Raw frame storage
 
@@ -70,11 +73,21 @@ read-modify-write of a growing array.
 interface CalibrationStepFrame {
   schemaVersion: number;
   calibrationId: string;
-  stepId: NonFormantStepId;
+  stepId: StepId;              // NonFormantStepId | CornerVowelStepId
   levelDb: number;
-  f0Hz: number | null;
+  f0Hz: number | null;         // steps 0/1/2/4/5 only
+  formants: Formants | null;   // corner-i/corner-a/corner-u only
 }
 ```
+
+`stepId` widened from `NonFormantStepId` to `StepId`, and `formants`
+was added, when the corner-vowel steps landed —
+`CALIBRATION_SCHEMA_VERSION` bumped 1 → 2 (additive; schemaVersion-1
+records predate corner-vowel frames entirely, nothing about them
+changes retroactively). Exactly one of `f0Hz`/`formants` is non-null
+per frame, determined by which step family produced it — not a
+discriminated union with an explicit tag, since the discriminant
+(`stepId`'s family) is already available on the frame itself.
 
 No per-reading timestamp — `CalibrationEngine`'s `StepReading` doesn't
 carry one (see `src/calibration/index.ts`) — so ordering within a step
