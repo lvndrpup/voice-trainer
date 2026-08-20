@@ -19,6 +19,7 @@ runs client-side: audio never leaves the browser.
 - [Audio capture](./audio-capture.md) — mic capture module: API, audio graph, state machine
 - [Spectrogram](./spectrogram.md) — log-frequency bin remapping and the scrolling canvas renderer
 - [Pitch detection](./pitch-detection.md) — the autocorrelation-based F0 estimator
+- [Formant extraction](./formant-extraction.md) — the LPC-based F1/F2 estimator
 - [Session store](./session-store.md) — IndexedDB schema and the SessionStore API
 - [Testing](./testing.md) — unit tests vs. the Playwright e2e suite, and how to run each
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record

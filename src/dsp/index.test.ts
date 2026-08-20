@@ -6,6 +6,7 @@ import {
   medianOfFinite,
   estimateHabitualF0Hz,
   estimateComfortableF0Range,
+  estimateFormants,
 } from "./index.ts";
 
 function sineWave(frequencyHz: number, sampleRate: number, length: number): Float32Array {
@@ -14,6 +15,57 @@ function sineWave(frequencyHz: number, sampleRate: number, length: number): Floa
     samples[i] = Math.sin((2 * Math.PI * frequencyHz * i) / sampleRate);
   }
   return samples;
+}
+
+/**
+ * A crude source-filter vowel synthesizer for testing estimateFormants
+ * against signals with known F1/F2, not a claim about real vocal-tract
+ * acoustics: a sawtooth excitation (broadband harmonic content, so both
+ * formants get excited) run through two cascaded 2nd-order IIR
+ * resonators tuned to the target frequencies. Standalone test helper,
+ * not exported from src/dsp — production formant extraction never
+ * synthesizes anything, only analyzes real capture.
+ */
+function synthesizeVowel(
+  f0Hz: number,
+  f1Hz: number,
+  f2Hz: number,
+  sampleRate: number,
+  durationSec: number,
+): Float32Array {
+  const length = Math.round(sampleRate * durationSec);
+  const excitation = new Float32Array(length);
+  for (let n = 0; n < length; n++) {
+    const phase = (f0Hz * n) / sampleRate;
+    excitation[n] = 2 * (phase - Math.floor(phase + 0.5)); // naive sawtooth, -1..1
+  }
+  return resonate(resonate(excitation, f1Hz, 80, sampleRate), f2Hz, 100, sampleRate);
+}
+
+/** A single 2nd-order resonant IIR filter (bandpass-like peak at
+ * centerHz), the standard building block for source-filter formant
+ * synthesis (e.g. the Klatt synthesizer's individual resonators). */
+function resonate(
+  input: Float32Array,
+  centerHz: number,
+  bandwidthHz: number,
+  sampleRate: number,
+): Float32Array {
+  const r = Math.exp((-Math.PI * bandwidthHz) / sampleRate);
+  const theta = (2 * Math.PI * centerHz) / sampleRate;
+  const a1 = 2 * r * Math.cos(theta);
+  const a2 = -r * r;
+  const b0 = 1 - a1 - a2;
+  const output = new Float32Array(input.length);
+  let y1 = 0;
+  let y2 = 0;
+  for (let n = 0; n < input.length; n++) {
+    const y = b0 * input[n] + a1 * y1 + a2 * y2;
+    output[n] = y;
+    y2 = y1;
+    y1 = y;
+  }
+  return output;
 }
 
 void test("computeLogFrequencyBins: constant input maps to constant output", () => {
@@ -168,4 +220,86 @@ void test("estimateComfortableF0Range: greeting step never lowers the ceiling be
 
 void test("estimateComfortableF0Range: returns null when the hum slide has no voiced readings", () => {
   assert.equal(estimateComfortableF0Range([300, 310], [null, null]), null);
+});
+
+// Corner-vowel-ish F1/F2 pairs (adult Peterson-Barney-adjacent values),
+// used only as synthetic-fixture ground truth for these tests — never
+// surfaced as shipped coaching targets. Recovered at both 44.1k and 48k
+// to confirm decimation makes the result sample-rate-independent, per
+// estimateFormants's doc comment.
+const CORNER_VOWEL_FIXTURES: readonly [string, number, number][] = [
+  ["/i/-like", 270, 2290],
+  ["/a/-like", 730, 1090],
+  ["/u/-like", 300, 870],
+];
+
+for (const sampleRate of [44100, 48000]) {
+  void test(`estimateFormants: recovers corner-vowel-like F1/F2 at ${sampleRate}Hz`, () => {
+    for (const [label, f1Hz, f2Hz] of CORNER_VOWEL_FIXTURES) {
+      const signal = synthesizeVowel(150, f1Hz, f2Hz, sampleRate, 0.5);
+      const result = estimateFormants(signal, sampleRate);
+      assert.ok(result !== null, `${label}: expected formants, got null`);
+      assert.ok(
+        Math.abs(result.f1Hz - f1Hz) < 40,
+        `${label}: expected F1 ~${f1Hz}Hz, got ${result.f1Hz.toFixed(1)}`,
+      );
+      assert.ok(
+        Math.abs(result.f2Hz - f2Hz) < 60,
+        `${label}: expected F2 ~${f2Hz}Hz, got ${result.f2Hz.toFixed(1)}`,
+      );
+    }
+  });
+}
+
+void test("estimateFormants: returns null for silence", () => {
+  assert.equal(estimateFormants(new Float32Array(4096), 48000), null);
+});
+
+void test("estimateFormants: returns null for non-finite input (NaN/Infinity)", () => {
+  assert.equal(estimateFormants(new Float32Array(4096).fill(NaN), 48000), null);
+  const withInfinity = new Float32Array(4096);
+  withInfinity[100] = Infinity;
+  assert.equal(estimateFormants(withInfinity, 48000), null);
+});
+
+void test("estimateFormants: recovers formants at a capture rate below the decimation target (no decimation applied)", () => {
+  // 16kHz is below the default 10kHz target's decimation trigger (factor
+  // floor(16000/10000) === 1), so this exercises the undecimated path and
+  // the adaptive-lpcOrder scaling that keeps it accurate there too.
+  const signal = synthesizeVowel(150, 500, 1500, 16000, 0.5);
+  const result = estimateFormants(signal, 16000);
+  assert.ok(result !== null, "expected formants, got null");
+  assert.ok(Math.abs(result.f1Hz - 500) < 45, `expected F1 ~500Hz, got ${result.f1Hz.toFixed(1)}`);
+  assert.ok(Math.abs(result.f2Hz - 1500) < 70, `expected F2 ~1500Hz, got ${result.f2Hz.toFixed(1)}`);
+});
+
+void test("estimateFormants: returns null for white noise (no real resonance, just LPC ripple)", () => {
+  const samples = new Float32Array(4096);
+  let seed = 42;
+  for (let i = 0; i < samples.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    samples[i] = (seed / 0x7fffffff) * 2 - 1;
+  }
+  assert.equal(estimateFormants(samples, 48000), null);
+});
+
+void test("estimateFormants: returns null for a pure tone (one resonance, no meaningful F2)", () => {
+  const samples = sineWave(440, 48000, 4096);
+  assert.equal(estimateFormants(samples, 48000), null);
+});
+
+void test("estimateFormants: throws when the window is too short for lpcOrder after decimation", () => {
+  assert.throws(() => estimateFormants(new Float32Array(20).fill(0.5), 48000));
+});
+
+void test("estimateFormants: rejects a too-short sample array", () => {
+  assert.throws(() => estimateFormants(new Float32Array(1), 48000));
+});
+
+void test("estimateFormants: rejects invalid options", () => {
+  const samples = synthesizeVowel(150, 730, 1090, 48000, 0.3);
+  assert.throws(() => estimateFormants(samples, 0));
+  assert.throws(() => estimateFormants(samples, 48000, { minFormantHz: 5000, maxFormantHz: 1000 }));
+  assert.throws(() => estimateFormants(samples, 48000, { lpcOrder: 1 }));
+  assert.throws(() => estimateFormants(samples, 48000, { lpcOrder: 1.5 }));
 });

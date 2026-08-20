@@ -223,6 +223,41 @@ for now," not "settled forever."
   [pitch-detection.md](./pitch-detection.md). v0.1 is now complete per
   [roadmap.md](./roadmap.md)'s criterion (mic capture, spectrogram, and
   F0 readout all run; nothing is stored).
+- "Custom FFT/LPC deferred until golden-file fixtures exist" (Decided —
+  architecture, above) is now partly landed: `estimateFormants`
+  (`src/dsp/index.ts`) is the first custom LPC code in the project. It
+  did **not** wait for a true golden-file/oracle-comparison harness —
+  it uses the same lighter synthetic-self-consistency bar the earlier
+  "Corrected" entry below already established for
+  `computeLogFrequencyBins`/`detectPitch` (synthesize a signal with
+  known ground truth, assert recovery within tolerance), not an
+  external reference implementation. Decimates by an integer factor
+  toward `2 * maxFormantHz` before LPC analysis (so the actual working
+  rate varies somewhat by capture rate rather than landing on one fixed
+  value) and peak-picks the spectral envelope rather than root-finding
+  the LPC denominator (avoids a complex-polynomial-root dependency).
+  See [formant-extraction.md](./formant-extraction.md) for the full
+  rationale. **Not validated against real voice** — only against a
+  crude synthetic source-filter model. An independent numerics audit
+  before merge found the first version's own claims understated two
+  real issues, both fixed or corrected in the same PR: `lpcOrder`
+  had been a hardcoded constant (now scales with the actual post-
+  decimation working rate, fixing measurably worse accuracy at capture
+  rates below the decimation trigger, e.g. 16kHz); and the doc's
+  original "a few percent" bias claim was based on a single low F0
+  (150Hz) — audit testing at F0 in the 220-350Hz range (well within
+  plausible feminization-training targets) found F1 errors up to and
+  beyond 25%, non-monotonic with F0, a real and still-open limitation
+  of peak-picked LPC at high F0 relative to formant bandwidth, not
+  something a small fix resolves. A second open limitation: formants
+  closer than ~150-300Hz apart can resolve as a single peak and return
+  `null` rather than a degraded estimate, which the corner-vowel
+  calibration step's implementer needs to know about (/u/-like vowels
+  are the likeliest to hit this). See formant-extraction.md's "Known
+  limitations" section for the full, quantified picture. Real-recording
+  validation and both limitations remain open follow-ups. Calibration
+  step 3 (wiring this into the calibration engine) is a separate,
+  dependent follow-up issue — not part of this landing.
 - Streak ban was initially blanket. Narrowed: adherence streaks are
   fine and probably good (practice frequency is the real predictor);
   performance streaks remain forbidden.
