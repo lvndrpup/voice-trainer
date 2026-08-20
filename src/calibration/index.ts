@@ -170,7 +170,11 @@ function computeCornerVowelValidity(
   stepId: CornerVowelStepId,
   readings: readonly FormantStepReading[],
 ): ValidityCheck {
-  const voicedCount = readings.filter((r) => r.formants !== null).length;
+  // != null (not !==) deliberately treats `formants: undefined` the
+  // same as `formants: null` — submitStep's shape guard only checks
+  // that the `formants` key exists, not that its value is well-typed,
+  // so a malformed-but-present value shouldn't count as "voiced" here.
+  const voicedCount = readings.filter((r) => r.formants != null).length;
   const ratio = readings.length === 0 ? 0 : voicedCount / readings.length;
   const passed = ratio >= MIN_VOICED_RATIO;
   return {
@@ -246,7 +250,8 @@ function computeStepValidity(
  * estimateHabitualF0Hz), producing one Formants estimate for the
  * step. Null if no reading in the window produced formants at all. */
 function aggregateFormants(readings: readonly FormantStepReading[]): Formants | null {
-  const voiced = readings.map((r) => r.formants).filter((f): f is Formants => f !== null);
+  // != null, same reasoning as computeCornerVowelValidity above.
+  const voiced = readings.map((r) => r.formants).filter((f): f is Formants => f != null);
   const f1Hz = medianOfFinite(voiced.map((f) => f.f1Hz));
   const f2Hz = medianOfFinite(voiced.map((f) => f.f2Hz));
   return f1Hz === null || f2Hz === null ? null : { f1Hz, f2Hz };

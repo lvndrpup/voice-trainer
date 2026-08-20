@@ -237,6 +237,29 @@ void test("CalibrationEngine: submitStep throws on FormantStepReading submitted 
   }, CalibrationEngineError);
 });
 
+void test("CalibrationEngine: a formants:undefined reading (key present, value malformed) is treated as unvoiced through to buildDraft, not a crash", () => {
+  // submitStep's shape guard only checks that the `formants` key
+  // exists, not that its value is well-typed -- a residual gap a
+  // wizard-correctness review found even after that guard landed
+  // (repro: buildDraft() throwing "Cannot read properties of
+  // undefined" while medianing a formants value that was never
+  // actually a Formants). Fixed downstream instead: `formants != null`
+  // (not `!== null`) treats undefined the same as null rather than
+  // counting it as a confident reading, in both the validity check and
+  // the aggregation buildDraft() relies on.
+  const engine = new CalibrationEngine(null);
+  const malformed = [
+    { levelDb: -20, formants: undefined } as unknown as FormantStepReading,
+    { levelDb: -20, formants: PLAUSIBLE_FORMANTS },
+  ];
+  completeAllSteps(engine, {}, { "corner-i": malformed });
+  assert.doesNotThrow(() => engine.buildDraft());
+  const draft = engine.buildDraft();
+  // Only the one well-formed reading was voiced, so the median is just
+  // that reading's own values, not corrupted by the malformed one.
+  assert.deepEqual(draft.cornerVowels?.i, PLAUSIBLE_FORMANTS);
+});
+
 void test("CalibrationEngine: noise-floor check fails when step 0's level is above threshold", () => {
   const engine = new CalibrationEngine(null);
   engine.beginStep(0);
