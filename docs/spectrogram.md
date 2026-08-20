@@ -77,6 +77,21 @@ defaults). No colormap dependency, kept intentionally simple for a
 first-pass instrument display — revisit if a warmer/perceptual
 colormap turns out to matter once there's something to look at.
 
+Any pixel `pushColumn()` actually draws gets a `MIN_DRAWN_LEVEL` (24 of
+255) brightness floor, even at or below `minDb` — without it, intensity
+clamped to 0 at the noise floor and `clear()`'s solid-black fill were
+the same `rgb(0,0,0)`, so "quiet signal, correctly captured" and
+"nothing drawn here yet" were visually indistinguishable (issue #64).
+The floor only raises the low end of the clamp; `maxDb` still maps to
+255 and the rest of the intensity range is unrescaled, so above-floor
+signal keeps its existing contrast — genuinely quiet-but-above-`minDb`
+signal whose natural level would fall under 24 also gets pulled up to
+the same floor a literally-at-`minDb` pixel gets, which is the
+accepted tradeoff of any floor scheme, not a bug. 24 is a reasonable
+low value chosen to be visibly distinct from pure black without
+reading as real mid-range signal, not a perceptually measured
+threshold.
+
 ## Accessibility
 
 Surfaced by dogfooding the `accessibility-tester` subagent against the
@@ -111,13 +126,15 @@ it previously had no accessible name or fallback content at all.
 The same audit pass found three further gaps left open, filed
 separately rather than folded into this fix (out of scope for issue
 #38, which was scoped to the readouts and the canvas label):
-keyboard focus is dropped to `<body>` on every start/stop/delete/export
+keyboard focus being dropped to `<body>` on every start/delete/export
 action because the just-activated button gets disabled without a
-restore-focus call; below-noise-floor signal renders identically to
-the blank canvas background (`level = 0` for both); and the grayscale
-magnitude-to-brightness mapping's earlier colorblind sign-off checked
+restore-focus call (issue #63, fix pending merge); below-noise-floor
+signal rendering identically to the blank canvas background (issue
+#64 — **fixed**, see "Magnitude-to-brightness mapping" above); and the
+grayscale mapping's earlier colorblind sign-off checking
 hue-independence but not perceptual linearity, so quiet-end contrast
-may be compressed relative to sRGB's actual response curve
+may be compressed relative to sRGB's actual response curve (issue #65,
+still open)
 [likely — not independently measured with a contrast-analysis tool].
 
 ## Testing

@@ -5,6 +5,21 @@ export interface SpectrogramRendererOptions {
   maxDb?: number;
 }
 
+// Floor brightness (out of 255) for any pixel pushColumn() actually
+// draws, however quiet. Without this, intensity at or below minDb
+// clamps to level 0 — identical to clear()'s solid-black fill — so
+// "quiet signal, correctly at the noise floor" and "nothing has been
+// drawn here yet" were visually indistinguishable (issue #64). Only
+// clamps the low end up; maxDb still maps to 255 unchanged, and this
+// doesn't rescale the rest of the intensity range, so above-floor
+// signal keeps its existing contrast — the tradeoff is that genuinely
+// quiet-but-above-minDb signal whose natural level would fall under 24
+// also gets pulled up to the floor, which is the same floor a
+// literally-at-minDb pixel gets. Chosen as visibly distinct from pure
+// black without reading as "real" mid-range signal — not perceptually
+// measured, just a reasonable low value (see docs/spectrogram.md).
+const MIN_DRAWN_LEVEL = 24;
+
 /**
  * Scrolls a log-frequency spectrogram across a canvas, one column per
  * pushColumn() call. New columns enter on the right and existing
@@ -51,7 +66,7 @@ export class SpectrogramRenderer {
     for (let y = 0; y < height; y++) {
       const db = magnitudesDb[height - 1 - y];
       const intensity = Math.max(0, Math.min(1, (db - this.#minDb) / range));
-      const level = Math.round(intensity * 255);
+      const level = Math.max(MIN_DRAWN_LEVEL, Math.round(intensity * 255));
       this.#ctx.fillStyle = `rgb(${level}, ${level}, ${level})`;
       this.#ctx.fillRect(width - 1, y, 1, 1);
     }
