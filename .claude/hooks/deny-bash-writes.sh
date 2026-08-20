@@ -47,13 +47,21 @@ fi
 # (word-boundary, not substring — "grep -rn rm " still shouldn't trip
 # the *substring* case, but genuinely does trip this on purpose now,
 # since "rm" as its own word is exactly as ambiguous as "rm" as a
-# command; see the module comment above). `git` allows up to ~40 chars
-# of anything-but-a-shell-separator between it and the subcommand
-# (rather than enumerating flag shapes) so a value-taking global flag
-# like `git -C /tmp commit` doesn't slip past a "flag, no value"
-# assumption — bounded, and excluding `;&|`, so it can't reach across
-# into an unrelated later command in the same string.
-if printf '%s' "$command" | grep -qE '\b(rm|mv|cp|tee)\b|\bsed\b[[:space:]]+-i\b|\bgit\b[^;&|]{0,40}\b(add|commit|push|reset|checkout|stash|apply|clean|rm)\b'; then
+# command; see the module comment above). `git` allows any run of
+# anything-but-a-shell-separator between it and the subcommand
+# (rather than enumerating flag shapes, or a fixed-length window — a
+# second wizard-correctness pass found a 40-char cap itself bypassable
+# with an ordinary long path, e.g. `git -C /a/really/long/project/path
+# commit`) so a value-taking global flag like `git -C /tmp commit`
+# doesn't slip past a "flag, no value" assumption. Unbounded but still
+# excludes `;&|`, so it can't reach across into an unrelated later
+# command in the same string — the tradeoff is a git invocation whose
+# own arguments happen to contain a bare "commit"/"add"/etc as data
+# (e.g. `git log --grep="fix commit message"`) would now also deny;
+# none of this hook's four target agents' documented workflows do
+# that (they only ever run plain `git log --follow` / `git show`), so
+# this is accepted rather than built around.
+if printf '%s' "$command" | grep -qE '\b(rm|mv|cp|tee)\b|\bsed\b[[:space:]]+-i\b|\bgit\b[^;&|]*\b(add|commit|push|reset|checkout|stash|apply|clean|rm)\b'; then
   deny "This agent is read-only. \"$command\" looks like a write/mutate command, which is outside its job. If this is a false positive, tell the user rather than working around it."
 fi
 
