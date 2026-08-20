@@ -72,6 +72,8 @@ can't be part of the PR it's documenting. After a PR merges:
 | v0.3 | #44 | #47 | `1849d65` | Corner-vowel (3-step) formant capture wired into CalibrationEngine; CALIBRATION_SCHEMA_VERSION bumped to 2 |
 | v0.3 | #53 | #59 | `7a5a1db` | Wizard now persists raw per-step readings into `calibrationFrames` instead of an empty map |
 | v0.3 | #54 | #60 | `b1a20c3` | Calibration wizard accessibility fixes — cancellation/completion focus handling, deferred validity announcements, redo re-announcement, focus-guard for programmatic focus calls |
+| v0.3 | #38 | #62 | `fd95f50` | Live-region fix for peak dB/F0 readouts (decoupled visual refresh from announcement rate) + `aria-label` on the spectrogram canvas |
+| v0.3 | #68 | #70 | `111c4e0` | `estimateFormants` unit test fixtures switched to realistic 2048-sample capture-sized windows, matching what `MicrophoneCapture` actually provides in production |
 
 ## Infra & Tooling
 
