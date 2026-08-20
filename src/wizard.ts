@@ -25,6 +25,7 @@ import {
   CalibrationEngine,
   STEP_ORDER,
   STEP_PROMPTS,
+  isCornerVowelStepId,
   type StepId,
   type StepReading,
   type FormantStepReading,
@@ -46,10 +47,6 @@ export interface WizardController {
    * changes, so the wizard can disable its start button while the
    * instrument holds the microphone. */
   setInstrumentActive(active: boolean): void;
-}
-
-function isCornerVowelId(id: StepId): boolean {
-  return typeof id === "string";
 }
 
 function stepPromptText(id: StepId): string {
@@ -83,7 +80,7 @@ function collectStepReadings(
       reject(new WizardCancelledError());
       return;
     }
-    const formant = isCornerVowelId(stepId);
+    const formant = isCornerVowelStepId(stepId);
     const pitchReadings: StepReading[] = [];
     const formantReadings: FormantStepReading[] = [];
 
@@ -208,17 +205,30 @@ export function initCalibrationWizard(
     panel.hidden = false;
     statusEl.textContent = "";
 
+    // Claim exclusivity *before* awaiting capture.start(), not after it
+    // resolves — see the matching comment in main.ts's handleStart()
+    // for why: the native permission prompt can stay open indefinitely,
+    // and gating on the resolved state left a real window where the
+    // instrument could also start during that wait.
+    onActiveChange(true);
     let info;
     try {
+      // Known, low-impact gap (wizard-review): clicking Cancel while
+      // this await is pending isn't observed until the next tick of
+      // collectStepReadings()'s own `signal.aborted` check, since
+      // nothing here races the abort against capture.start() itself.
+      // The mic still gets stopped correctly in the finally block
+      // below either way — worst case is a brief flash of "Capturing"
+      // before the cancel takes visible effect, not a stuck state.
       info = await capture.start();
     } catch (err) {
       statusEl.textContent = describeCaptureError(err);
+      onActiveChange(false);
       resetToIdle();
       abortController = null;
       return;
     }
 
-    onActiveChange(true);
     const engine = new CalibrationEngine(info.deviceId);
 
     try {
@@ -237,7 +247,7 @@ export function initCalibrationWizard(
           stepDurationMs(stepId),
           signal,
         );
-        const check = isCornerVowelId(stepId)
+        const check = isCornerVowelStepId(stepId)
           ? engine.submitStep(formantReadings)
           : engine.submitStep(pitchReadings);
         showValidity(check);

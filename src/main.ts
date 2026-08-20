@@ -72,6 +72,16 @@ function tick(): void {
 async function handleStart(): Promise<void> {
   button.disabled = true;
   statusEl.textContent = "Requesting microphone…";
+  // Claim exclusivity *before* awaiting capture.start(), not after it
+  // resolves — the native getUserMedia permission prompt can stay open
+  // indefinitely, and a wizard-review correctness pass found that
+  // gating on the resolved state left a real window where both this
+  // instrument and the wizard could have a permission prompt pending
+  // at once, then both become active. Neither MicrophoneCapture
+  // instance would reject that — #state is a private per-instance
+  // field, not a cross-instance registry (src/audio/index.ts) — so
+  // this claim is the only thing actually closing the window.
+  wizardController.setInstrumentActive(true);
   try {
     const info = await capture.start();
     let statusText = `Capturing (device ${info.deviceId ?? "unknown"})`;
@@ -93,10 +103,10 @@ async function handleStart(): Promise<void> {
     deleteAllButton.disabled = true;
     exportButton.disabled = true;
     lastFrameLoggedAt = 0;
-    wizardController.setInstrumentActive(true);
     tick();
   } catch (err) {
     statusEl.textContent = describeCaptureError(err);
+    wizardController.setInstrumentActive(false);
     throw err;
   } finally {
     button.disabled = false;
