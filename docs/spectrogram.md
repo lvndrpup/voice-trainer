@@ -77,6 +77,49 @@ defaults). No colormap dependency, kept intentionally simple for a
 first-pass instrument display — revisit if a warmer/perceptual
 colormap turns out to matter once there's something to look at.
 
+## Accessibility
+
+Surfaced by dogfooding the `accessibility-tester` subagent against the
+real UI (issue #38): `#peak-db` and `#f0-hz` (`index.html`) were plain
+`<span>`s updated via `textContent` on every ~60Hz `requestAnimationFrame`
+tick in `main.ts`'s `tick()`, with no live region — a screen reader had
+no way to know these values were changing at all.
+
+The first fix attempt just added `role="status"` to their wrapping
+`<p>` elements and throttled the write to ~10Hz (this project's usual
+UI-update cadence, see [session-store.md](./session-store.md)). A
+second audit pass against that fix caught a real remaining problem:
+`role="status"` implies `aria-live="polite"`, which *queues*
+announcements rather than dropping superseded ones — even at 10Hz that
+queues 10-20 announcements/second (both regions combined) faster than
+speech can keep up, backing up into an unstoppable stream a
+screen-reader user can't outrun.
+
+The actual fix decouples the two rates. `#peak-db`/`#f0-hz` are plain
+visual spans again (no live region, no `role="status"`) — a sighted
+user just watches them refresh continuously, which needs no
+announcement throttling at all. A separate element,
+`#readout-announcement`, is the only live region: visually hidden
+(clip-based, not `display:none`, so it stays in the accessibility tree)
+and updated at a much coarser `READOUT_ANNOUNCE_INTERVAL_MS` (1000ms),
+combining both values into one announcement ("Peak -20.3 dB, F0 180.2
+Hz") rather than two separate regions firing independently.
+
+`#spectrogram` also gained an `aria-label` describing what it shows —
+it previously had no accessible name or fallback content at all.
+
+The same audit pass found three further gaps left open, filed
+separately rather than folded into this fix (out of scope for issue
+#38, which was scoped to the readouts and the canvas label):
+keyboard focus is dropped to `<body>` on every start/stop/delete/export
+action because the just-activated button gets disabled without a
+restore-focus call; below-noise-floor signal renders identically to
+the blank canvas background (`level = 0` for both); and the grayscale
+magnitude-to-brightness mapping's earlier colorblind sign-off checked
+hue-independence but not perceptual linearity, so quiet-end contrast
+may be compressed relative to sRGB's actual response curve
+[likely — not independently measured with a contrast-analysis tool].
+
 ## Testing
 
 `src/dsp/index.test.ts` runs under Node's built-in test runner
