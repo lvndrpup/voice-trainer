@@ -43,6 +43,15 @@ import { CalibrationStore } from "./store/calibration";
 // enough for MIN_VOICED_RATIO (0.5, src/calibration) to mean anything.
 const READING_INTERVAL_MS = 100;
 
+// [speculative] Not measured against a real screen reader — just long
+// enough that showValidity()'s role="status" text update gets its own
+// speech turn before the Next/Finish button's focus-change
+// announcement starts. wizard-review flagged the original hardcoded
+// 150 as an unsourced number; naming it here at least makes it one
+// tunable value instead of a bare literal, but the value itself is
+// still a guess pending real AT verification (see calibration-wizard.md).
+const FOCUS_ANNOUNCEMENT_DELAY_MS = 150;
+
 export interface WizardController {
   /** main.ts calls this whenever the instrument's own active state
    * changes, so the wizard can disable its start button while the
@@ -133,6 +142,7 @@ export function initCalibrationWizard(
 ): WizardController {
   const startButton = requireElement<HTMLButtonElement>("#wizard-start");
   const panel = requireElement<HTMLDivElement>("#wizard-panel");
+  const stepInfoEl = requireElement<HTMLDivElement>("#wizard-step-info");
   const progressEl = requireElement<HTMLParagraphElement>("#wizard-progress");
   const promptEl = requireElement<HTMLParagraphElement>("#wizard-prompt");
   const validityEl = requireElement<HTMLParagraphElement>("#wizard-validity");
@@ -171,9 +181,50 @@ export function initCalibrationWizard(
     validityEl.textContent = check?.message ?? "";
   }
 
-  function showProgress(index: number, stepId: StepId): void {
-    progressEl.textContent = `Step ${index + 1} of ${STEP_ORDER.length}`;
-    promptEl.textContent = stepPromptText(stepId);
+  /** Only steal focus if the user hasn't deliberately moved it
+   * somewhere outside the wizard (e.g. tabbed to the instrument's own
+   * controls during a multi-second recording step) — `null`/`body`
+   * covers the case right after we ourselves hid a focused element
+   * (the browser drops focus to `body` when its focused ancestor
+   * becomes non-renderable), which is exactly when we *do* want to
+   * claim it back. An `accessibility-tester` audit flagged the
+   * original unconditional `.focus()` calls as forcing a context
+   * change regardless of where the user currently was. */
+  function claimFocusIfNotElsewhere(el: HTMLElement): void {
+    const active = document.activeElement;
+    if (active === null || active === document.body || panel.contains(active)) {
+      el.focus();
+    }
+  }
+
+  function showProgress(index: number, stepId: StepId, signal: AbortSignal): void {
+    // Clear first, then set on the next tick, rather than writing the
+    // real text directly — redoing a step re-shows identical text
+    // (same step, same prompt), and several screen-reader/live-region
+    // implementations treat an unchanged text value as a no-op and
+    // skip announcing it at all. Clearing first forces a real content
+    // change every time, redo or not. Flagged by an
+    // `accessibility-tester` audit against this exact redo path.
+    progressEl.textContent = "";
+    promptEl.textContent = "";
+    setTimeout(() => {
+      // Guard against a cancel landing inside this 0ms window — without
+      // it, a cancelled wizard could still write step text and steal
+      // focus back a tick after resetToIdle() already ran (wizard-review
+      // correctness finding: untracked timers racing abort/redo).
+      if (signal.aborted) {
+        return;
+      }
+      progressEl.textContent = `Step ${index + 1} of ${STEP_ORDER.length}`;
+      promptEl.textContent = stepPromptText(stepId);
+      // aria-live="polite" on #wizard-step-info announces this on its
+      // own, but moving focus there too is deliberate belt-and-
+      // suspenders, not redundant noise: live-region announcements are
+      // reported unreliably by some screen readers when focus is
+      // elsewhere, and a sighted keyboard user gets no benefit at all
+      // from aria-live — focus is what actually orients them.
+      claimFocusIfNotElsewhere(stepInfoEl);
+    }, 0);
   }
 
   function buildCompletionMessage(draft: CalibrationDraft, saved: boolean): string {
@@ -236,7 +287,7 @@ export function initCalibrationWizard(
       let index = 0;
       while (index < STEP_ORDER.length) {
         const stepId = STEP_ORDER[index];
-        showProgress(index, stepId);
+        showProgress(index, stepId, signal);
         showValidity(null);
         redoButton.hidden = true;
         nextButton.hidden = true;
@@ -256,6 +307,27 @@ export function initCalibrationWizard(
         redoButton.hidden = false;
         nextButton.hidden = false;
         nextButton.textContent = index === STEP_ORDER.length - 1 ? "Finish" : "Next";
+        // Move focus to the primary action once it's actually
+        // interactive — a hidden button can't be focused, so this has
+        // to happen after unhiding it, not alongside showValidity()
+        // above. Delayed (not immediate) on purpose: focusing a
+        // control fires its own accessible-name announcement, and
+        // doing that in the same tick as showValidity()'s role="status"
+        // text update risks the focus announcement interrupting or
+        // racing the validity message — the one piece of feedback this
+        // whole step existed to produce. An accessibility-tester audit
+        // flagged the immediate version of this as a likely real
+        // problem, not just a theoretical one.
+        setTimeout(() => {
+          // Same abort guard as showProgress()'s timer — a redo or
+          // cancel that lands inside this window must not steal focus
+          // back after the step it belonged to is already gone
+          // (wizard-review correctness finding).
+          if (signal.aborted) {
+            return;
+          }
+          claimFocusIfNotElsewhere(nextButton);
+        }, FOCUS_ANNOUNCEMENT_DELAY_MS);
 
         const action = await waitForUserAction(signal);
         if (action === "redo") {
@@ -300,6 +372,14 @@ export function initCalibrationWizard(
       }
       panel.hidden = true;
       statusEl.textContent = buildCompletionMessage(draft, saved);
+      // Panel is now hidden and its focusable controls are gone, but
+      // routed through the same guard as every other focus call here —
+      // not unconditional. `saveCalibration()` above is awaited while
+      // the panel is still open; a user who tabbed away to the
+      // instrument's own controls during that window (wizard-review
+      // correctness finding) must not get yanked back just because the
+      // panel happened to close under them a moment later.
+      claimFocusIfNotElsewhere(statusEl);
     } catch (err) {
       if (!(err instanceof WizardCancelledError)) {
         throw err;
@@ -307,6 +387,12 @@ export function initCalibrationWizard(
       // Cancelled: no partial Calibration is ever saved (buildDraft()
       // only runs after the loop above completes normally), so there's
       // nothing to discard beyond letting `engine` go out of scope.
+      // Still needs its own user-facing feedback though — without this,
+      // cancelling was silent for a screen-reader user and dropped
+      // focus to <body> for a keyboard user (accessibility-tester
+      // audit finding).
+      statusEl.textContent = "Calibration cancelled — nothing was saved.";
+      claimFocusIfNotElsewhere(statusEl);
     } finally {
       await capture.stop();
       onActiveChange(false);

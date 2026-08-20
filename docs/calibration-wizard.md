@@ -104,6 +104,76 @@ calling `CalibrationEngine.getStepReadings()` for every step in
 persisted alongside the summary. See
 [calibration-store.md](./calibration-store.md).
 
+## Accessibility
+
+The wizard's own markup is plain, keyboard-operable elements from the
+start (real `<button>`s, no positive `tabindex`, no keyboard traps) —
+this section covers the parts that need more than that: async state
+changes a screen-reader user can't see and a sighted-only keyboard
+user gets no benefit from either.
+
+Audited via the `accessibility-tester` subagent against this actual
+markup and code, not just reasoned about. Its first-pass findings and
+how each was resolved:
+
+- **Step transitions and validity messages are announced.**
+  `#wizard-step-info` (wrapping `#wizard-progress` and
+  `#wizard-prompt`) has `aria-live="polite"`; `#wizard-validity` and
+  `#wizard-status` already had `role="status"` (implies
+  `aria-live="polite"`) from the original markup.
+- **Focus moves, not just announces.** `aria-live` alone is reported
+  unreliably by some screen readers when focus is elsewhere, and does
+  nothing at all for a sighted keyboard user. `#wizard-step-info` and
+  `#wizard-status` both have `tabindex="-1"` (focusable
+  programmatically, not via Tab); `claimFocusIfNotElsewhere()` guards
+  every programmatic focus call in the wizard (step transitions,
+  Next/Finish, completion, cancellation) so it's a no-op if the user
+  has deliberately tabbed to something outside the wizard panel first
+  — an unconditional `.focus()` would otherwise yank focus away from
+  wherever they actually are (audit finding: "steals focus even if the
+  user tabbed elsewhere"). A `wizard-review` correctness pass on this
+  fix caught a real gap in the first version: completion and
+  cancellation called `statusEl.focus()` directly, unguarded, which
+  mattered because `saveCalibration()` is awaited while the panel is
+  still open — a user who tabbed away during that wait would still get
+  yanked back once the panel closed a moment later. Both call sites now
+  go through the same guard as everything else.
+- **Untracked timers are abort-aware.** The redo-announcement
+  clear/set (`showProgress`) and the delayed Next/Finish focus both
+  use `setTimeout` outside any collection loop, so neither was
+  cancelled by the wizard's own `AbortController` (used everywhere
+  else for cancellation). Both now check `signal.aborted` before
+  acting, so a cancel landing inside one of these short windows can't
+  write stale step text or steal focus back after the panel is
+  already gone.
+- **Redo re-announces identical text.** Re-running the same step shows
+  the same progress/prompt text, which some screen readers treat as a
+  no-op and don't re-announce. `showProgress()` clears
+  `#wizard-progress`/`#wizard-prompt` and re-sets them on the next
+  tick (`setTimeout(…, 0)`) so the live region always sees a real
+  text change, not just an identical write.
+- **Next/Finish focus is delayed, not immediate.** Focusing a button
+  fires its own accessible-name announcement; doing that in the same
+  tick as `showValidity()`'s `role="status"` update risked the focus
+  announcement clobbering the validity message — the one piece of
+  feedback the step exists to produce. The focus call is now deferred
+  behind `showValidity()` by `FOCUS_ANNOUNCEMENT_DELAY_MS` (150ms).
+  [speculative] — not measured against a real screen reader, just a
+  round number chosen to give the validity announcement its own turn;
+  a `wizard-review` pass flagged the original bare literal as an
+  unsourced number, so it's now at least a single named, documented
+  constant rather than a magic number repeated nowhere else.
+- **Cancellation and completion give feedback, not silence.**
+  Cancelling used to discard state without telling anyone and drop
+  focus to `<body>`; completion announced its message but still
+  dropped focus to `<body>` afterward, since the panel (and its
+  buttons) are hidden by then. Both paths now set `#wizard-status`'s
+  text and focus it explicitly.
+- **Progress has a text equivalent.** `#wizard-progress` always reads
+  "Step N of 8," not a purely visual indicator.
+- Colorblind-safe contrast doesn't apply here — the wizard has no
+  color-coded state, only text.
+
 ## Testing
 
 `e2e/calibration-wizard.spec.ts` drives a full 8-step attempt against
