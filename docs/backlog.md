@@ -24,15 +24,11 @@ for what's actually scheduled.
 Candidate `.claude/agents/*.md` beyond the existing wizard-review
 persona set (correctness/security/simplicity/performance, reviews
 PRs) and the shipped `groomer`, `reviewer`, `ledger-scribe`,
-`docs-auditor`, `accessibility-tester`, and `debugger` subagents.
-Parked here rather than filed as issues since these are dev tooling,
-not versioned product scope — pick one, and it graduates straight to
-a drafted agent file, no milestone needed.
+`docs-auditor`, `accessibility-tester`, `dsp-numerics-auditor`, and
+`debugger` subagents. Parked here rather than filed as issues since
+these are dev tooling, not versioned product scope — pick one, and it
+graduates straight to a drafted agent file, no milestone needed.
 
-- **dsp-numerics-auditor** — checks a new DSP estimator against
-  synthetic/analytic ground truth before ship, ahead of issue #17's
-  upcoming LPC/corner-vowel work. Narrower than wizard-correctness's
-  general bug hunt.
 - *(weaker, optional)* **dependency-gatekeeper** — flags new
   `package.json` deps/bundle size against CLAUDE.md's "ask before
   adding dependencies, no framework" rule. Partial overlap with
