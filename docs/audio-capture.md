@@ -44,8 +44,15 @@ graph LR
     UM["getUserMedia()"] --> MS["MediaStream (1 track)"]
     MS --> SRC["MediaStreamAudioSourceNode"]
     SRC --> AN["AnalyserNode<br/>fftSize=2048"]
-    AN -.->|getFloatFrequencyData| OUT["Float32Array (getSpectrum())"]
+    AN -.->|getFloatFrequencyData| OUT["Float32Array, frequency domain<br/>(getSpectrum())"]
+    AN -.->|getFloatTimeDomainData| OUT2["Float32Array, time domain<br/>(getWaveform())"]
 ```
+
+`getSpectrum()` (frequency domain) feeds the spectrogram; `getWaveform()`
+(time domain, same `fftSize`-length window) feeds `detectPitch` and
+`estimateFormants` — both read the same `AnalyserNode`, no second node
+needed. See [pitch-detection.md](./pitch-detection.md) and
+[formant-extraction.md](./formant-extraction.md).
 
 The analyser never connects to `audioContext.destination` — doing so
 would route the microphone to the speakers and create a feedback loop.
@@ -54,6 +61,7 @@ would route the microphone to the speakers and create a feedback loop.
 
 ```mermaid
 stateDiagram-v2
+    state "permission-requested" as permission_requested
     [*] --> uninitialized
     uninitialized --> permission_requested: start()
     permission_requested --> active: granted, context running
@@ -68,7 +76,7 @@ stateDiagram-v2
     stopped --> permission_requested: start()
 ```
 
-`denied` and `error` are also reachable to `active`/`permission_requested`
+`denied` and `error` are also reachable to `active`/`permission-requested`
 on retry — `start()` from any non-`active`/non-`permission-requested`
 state re-requests permission from scratch, except `suspended`, which
 resumes the existing context without re-prompting.
