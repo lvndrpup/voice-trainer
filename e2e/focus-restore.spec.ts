@@ -42,8 +42,11 @@ test("cancelling the delete-all confirm dialog also restores focus", async ({ pa
     void dialog.dismiss();
   });
   await page.locator("#delete-all").click();
-  // No disable/re-enable ever happens on this path (handleDeleteAll
-  // returns before touching deleteAllButton.disabled) — focus was never
-  // lost to begin with, so it's still on the button from the click itself.
+  // Regression guard, not a test of focusIfIdle(): no disable/re-enable
+  // ever happens on this path (handleDeleteAll returns before touching
+  // deleteAllButton.disabled), so focus was never lost to begin with —
+  // this asserts default browser click-focus behavior, guarding against
+  // a future change that starts disabling the button on this path too
+  // without also restoring focus (a wizard-review simplicity finding).
   expect(await activeElementId(page)).toBe("delete-all");
 });

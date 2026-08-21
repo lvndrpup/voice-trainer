@@ -180,8 +180,19 @@ async function handleDeleteAll(): Promise<void> {
     statusEl.textContent = "Failed to delete sessions — see console.";
     throw err;
   } finally {
-    deleteAllButton.disabled = false;
-    focusIfIdle(deleteAllButton);
+    // Only re-enable/re-focus if capture isn't the one holding this
+    // button disabled right now — handleStart() also disables
+    // deleteAllButton for mutual exclusion while capturing (below), and
+    // an unconditional re-enable here would race it: click Delete, then
+    // start capture before the delete resolves, and this finally would
+    // wrongly re-enable (and now re-focus) a button that's supposed to
+    // stay disabled during capture. A wizard-review correctness pass
+    // found the same pattern in handleExport(); this one was symmetric
+    // and unflagged, fixed alongside it.
+    if (capture.state !== "active") {
+      deleteAllButton.disabled = false;
+      focusIfIdle(deleteAllButton);
+    }
   }
 }
 
@@ -205,8 +216,17 @@ async function handleExport(): Promise<void> {
     statusEl.textContent = "Failed to export sessions — see console.";
     throw err;
   } finally {
-    exportButton.disabled = false;
-    focusIfIdle(exportButton);
+    // Same race as handleDeleteAll() above, and the same fix: don't
+    // re-enable/re-focus if capture has since claimed this button for
+    // its own mutual-exclusion lock. A wizard-review correctness pass
+    // on #72 found this exact scenario (click Export, then start
+    // capture before the export resolves) and flagged that the new
+    // focusIfIdle() call below made the symptom worse — wrongly
+    // clickable *and* wrongly focused, not just wrongly clickable.
+    if (capture.state !== "active") {
+      exportButton.disabled = false;
+      focusIfIdle(exportButton);
+    }
   }
 }
 
