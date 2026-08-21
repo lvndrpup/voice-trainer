@@ -87,17 +87,46 @@ digital level the mapping produces across the full `minDb`–`maxDb`
 range, converted through the sRGB EOTF (level → linear light) and then
 into CIE L\* (designed to be approximately perceptually uniform per
 unit — equal L\* deltas should look like equal brightness steps to a
-human viewer). **Result: the mapping is already close to perceptually
-uniform, not compressed.** Average L\* change per 5dB step in the
-quiet half of the range (-100 to -65dB) vs. the loud half (-65 to
--30dB) differ by well under 15% either direction — not the kind of
-gap a gamma-correction fix would meaningfully improve. This isn't
-coincidental: dB is itself already a logarithmic (power-ratio) scale,
-and CIE L\* is approximately a cube-root compression of linear
+human viewer).
+
+| dB | level | L\* |
+|---|---|---|
+| -100 | 0 | 0.0 |
+| -95 | 18 | 5.5 |
+| -90 | 36 | 14.2 |
+| -85 | 55 | 23.1 |
+| -80 | 73 | 31.0 |
+| -75 | 91 | 38.7 |
+| -70 | 109 | 46.0 |
+| -65 | 128 | 53.6 |
+| -60 | 146 | 60.6 |
+| -55 | 164 | 67.4 |
+| -50 | 182 | 74.1 |
+| -45 | 200 | 80.6 |
+| -40 | 219 | 87.4 |
+| -35 | 237 | 93.8 |
+| -30 | 255 | 100.0 |
+
+Average |ΔL\*| per 5dB step: **7.66** in the quiet half (-100 to
+-65dB) vs. **6.63** in the loud half (-65 to -30dB) — a 13.4%
+difference, with the *quiet* half showing the larger perceptual steps,
+not the smaller ones. **Result: not compressed at the quiet end** —
+if anything, mildly the opposite of the suspected direction. This
+isn't coincidental: dB is itself already a logarithmic (power-ratio)
+scale, and CIE L\* is approximately a cube-root compression of linear
 luminance — the two curves' shapes happen to roughly cancel when
 composed through sRGB's own gamma encoding. **No mapping change
 adopted** — the earlier `[likely]` flag is superseded by this
-quantified check, not merely deferred.
+quantified check, not merely deferred. 13.4% is a real, stated number,
+not a "well under some threshold" hand-wave, but it's also not a huge
+margin — a materially different check (e.g. 1dB steps instead of 5,
+or a different quiet/loud split point) could plausibly shift it a few
+points either way; the conclusion (not compressed, quiet half if
+anything slightly favored) is the load-bearing claim here, not the
+exact 13.4% figure. (Numbers independently re-derived and confirmed
+by a `dsp-numerics-auditor` pass against `SpectrogramRenderer`'s
+actual mapping code and the sRGB EOTF / CIE L\* formulas, including
+reference-point sanity checks — see the PR this landed in.)
 
 This analysis is of the mapping *function* itself (any dB value → its
 perceptual lightness), which is independent of what dB values real
