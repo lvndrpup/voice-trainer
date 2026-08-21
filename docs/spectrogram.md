@@ -78,19 +78,14 @@ first-pass instrument display — revisit if a warmer/perceptual
 colormap turns out to matter once there's something to look at.
 
 Any pixel `pushColumn()` actually draws gets a `MIN_DRAWN_LEVEL` (24 of
-255) brightness floor, even at or below `minDb` — without it, intensity
-clamped to 0 at the noise floor and `clear()`'s solid-black fill were
-the same `rgb(0,0,0)`, so "quiet signal, correctly captured" and
-"nothing drawn here yet" were visually indistinguishable (issue #64).
-The floor only raises the low end of the clamp; `maxDb` still maps to
-255 and the rest of the intensity range is unrescaled, so above-floor
-signal keeps its existing contrast — genuinely quiet-but-above-`minDb`
-signal whose natural level would fall under 24 also gets pulled up to
-the same floor a literally-at-`minDb` pixel gets, which is the
-accepted tradeoff of any floor scheme, not a bug. 24 is a reasonable
-low value chosen to be visibly distinct from pure black without
-reading as real mid-range signal, not a perceptually measured
-threshold.
+255) brightness floor, even at or below `minDb` — without it, that
+clamped-to-0 intensity and `clear()`'s solid-black fill were the same
+`rgb(0,0,0)`, so "quiet signal, correctly captured" and "nothing drawn
+here yet" were visually indistinguishable (issue #64). See the
+`MIN_DRAWN_LEVEL` comment in `src/render/index.ts` for the full
+rationale and accepted tradeoff — kept there rather than duplicated
+here, since it's the version more likely to stay current as the code
+changes.
 
 ## Accessibility
 
