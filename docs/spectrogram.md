@@ -82,9 +82,9 @@ colormap turns out to matter once there's something to look at.
 perceptually *compressed* at the quiet end — equal digital-value steps
 aren't equal perceived-brightness steps under sRGB's actual (~2.2
 gamma) display response, and quiet/breathy vocal content is exactly
-what this instrument needs to keep legible. Checked directly: for each
-digital level the mapping produces across the full `minDb`–`maxDb`
-range, converted through the sRGB EOTF (level → linear light) and then
+what this instrument needs to keep legible. Checked directly: sampled
+digital levels at 5dB steps across the full `minDb`–`maxDb` range,
+converted through the sRGB EOTF (level → linear light) and then
 into CIE L\* (designed to be approximately perceptually uniform per
 unit — equal L\* deltas should look like equal brightness steps to a
 human viewer).
@@ -135,10 +135,11 @@ data to be conclusive about the function's own linearity, unlike the
 formant-extraction investigations (issue #46/#67) which are about
 signal content, not a fixed display curve. Real-recording validation
 of what dB range typical quiet/breathy speech actually falls into
-remains a separate, still-open gap (same category noted throughout
-this doc's Testing section) — but it would confirm where real content
-lands on this curve, not change the conclusion that the curve itself
-is close to uniform across its whole range.
+remains a separate, still-open gap — tracked as issue #75, since
+issue #65's own acceptance criteria included that check and it wasn't
+satisfiable here. It would confirm where real content lands on this
+curve, not change the conclusion that the curve itself is close to
+uniform across its whole range.
 
 ## Accessibility
 
