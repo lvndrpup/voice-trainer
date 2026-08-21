@@ -77,6 +77,40 @@ defaults). No colormap dependency, kept intentionally simple for a
 first-pass instrument display — revisit if a warmer/perceptual
 colormap turns out to matter once there's something to look at.
 
+**Investigated for issue #65**: an earlier accessibility audit flagged
+`[likely]` that this linear dB→digital-value mapping might be
+perceptually *compressed* at the quiet end — equal digital-value steps
+aren't equal perceived-brightness steps under sRGB's actual (~2.2
+gamma) display response, and quiet/breathy vocal content is exactly
+what this instrument needs to keep legible. Checked directly: for each
+digital level the mapping produces across the full `minDb`–`maxDb`
+range, converted through the sRGB EOTF (level → linear light) and then
+into CIE L\* (designed to be approximately perceptually uniform per
+unit — equal L\* deltas should look like equal brightness steps to a
+human viewer). **Result: the mapping is already close to perceptually
+uniform, not compressed.** Average L\* change per 5dB step in the
+quiet half of the range (-100 to -65dB) vs. the loud half (-65 to
+-30dB) differ by well under 15% either direction — not the kind of
+gap a gamma-correction fix would meaningfully improve. This isn't
+coincidental: dB is itself already a logarithmic (power-ratio) scale,
+and CIE L\* is approximately a cube-root compression of linear
+luminance — the two curves' shapes happen to roughly cancel when
+composed through sRGB's own gamma encoding. **No mapping change
+adopted** — the earlier `[likely]` flag is superseded by this
+quantified check, not merely deferred.
+
+This analysis is of the mapping *function* itself (any dB value → its
+perceptual lightness), which is independent of what dB values real
+vocal content actually produces — so it doesn't need real-recording
+data to be conclusive about the function's own linearity, unlike the
+formant-extraction investigations (issue #46/#67) which are about
+signal content, not a fixed display curve. Real-recording validation
+of what dB range typical quiet/breathy speech actually falls into
+remains a separate, still-open gap (same category noted throughout
+this doc's Testing section) — but it would confirm where real content
+lands on this curve, not change the conclusion that the curve itself
+is close to uniform across its whole range.
+
 ## Accessibility
 
 Surfaced by dogfooding the `accessibility-tester` subagent against the
@@ -111,14 +145,14 @@ it previously had no accessible name or fallback content at all.
 The same audit pass found three further gaps left open, filed
 separately rather than folded into this fix (out of scope for issue
 #38, which was scoped to the readouts and the canvas label):
-keyboard focus being dropped to `<body>` on every start/delete/export
 action (issue #63 — **fixed**, see below); below-noise-floor signal
 rendering identically to the blank canvas background (`level = 0` for
-both, issue #64, still open); and the grayscale magnitude-to-brightness
-mapping's earlier colorblind sign-off checking hue-independence but not
-perceptual linearity, so quiet-end contrast may be compressed relative
-to sRGB's actual response curve (issue #65, still open)
-[likely — not independently measured with a contrast-analysis tool].
+both, issue #64, still open); and a suspicion that the grayscale
+mapping's earlier colorblind sign-off (hue-independence only) might
+also hide a perceptual-linearity gap at the quiet end (issue #65 —
+**investigated, not adopted**: see "Magnitude-to-brightness mapping"
+above — the mapping turned out to already be close to perceptually
+uniform, not compressed).
 
 **Issue #63 fix**: `handleStart()`, `handleDeleteAll()`, and
 `handleExport()` (`src/main.ts`) each disable the button that was just
