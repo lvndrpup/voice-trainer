@@ -74,6 +74,9 @@ can't be part of the PR it's documenting. After a PR merges:
 | v0.3 | #54 | #60 | `b1a20c3` | Calibration wizard accessibility fixes — cancellation/completion focus handling, deferred validity announcements, redo re-announcement, focus-guard for programmatic focus calls |
 | v0.3 | #38 | #62 | `fd95f50` | Live-region fix for peak dB/F0 readouts (decoupled visual refresh from announcement rate) + `aria-label` on the spectrogram canvas |
 | v0.3 | #68 | #70 | `111c4e0` | `estimateFormants` unit test fixtures switched to realistic 2048-sample capture-sized windows, matching what `MicrophoneCapture` actually provides in production |
+| v0.3 | #63 | #72 | `c8218e7` | Keyboard focus restored to start/delete/export buttons after re-enable (`focusIfIdle()` guard); also fixed an adjacent button re-enable race against capture state |
+| v0.3 | #65 | #74 | `be3c6b4` | Investigated spectrogram's linear dB→digital-value mapping via sRGB EOTF + CIE L* conversion; found it already near-perceptually-uniform, no mapping change adopted, resolving the prior `[likely]` accessibility flag |
+| v0.3 | #46 | #69 | `9f11f3f` | Investigated high-F0 `estimateFormants` accuracy mitigations (higher LPC order, pitch-synchronous windowing); neither adopted, `estimateFormants` unchanged, follow-ups filed as #67 and #68 |
 
 ## Infra & Tooling
 

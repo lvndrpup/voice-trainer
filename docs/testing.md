@@ -38,6 +38,13 @@ against a real `indexedDB`, not a polyfill or a mock.
   the downloaded export JSON matches what's in IndexedDB, that
   delete-all (confirmed) empties both object stores, and that
   cancelling the confirm dialog leaves the data alone.
+- `e2e/focus-restore.spec.ts` — asserts `document.activeElement` after
+  starting capture, exporting, and deleting-all (confirmed and
+  cancelled) — closes issue #63: disabling the just-clicked button
+  during each async operation used to drop focus to `<body>` with no
+  automatic re-target and nothing restoring it once re-enabled.
+  Playwright's `.click()` is a real mouse click, which focuses the
+  element first, the same as a keyboard Enter/Space activation would.
 
 ### What this doesn't cover
 

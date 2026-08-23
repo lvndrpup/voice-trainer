@@ -12,3 +12,16 @@ export function requireElement<T extends Element>(selector: string): T {
   }
   return el;
 }
+
+/** Focuses `el` only if nothing else has claimed focus in the meantime —
+ * `document.activeElement` is `null`/`<body>` right after a control is
+ * disabled (which drops focus with no automatic re-target), but is
+ * something else if the user has since deliberately tabbed/clicked
+ * elsewhere. Restoring focus unconditionally in that second case would
+ * yank it away from wherever the user actually is. */
+export function focusIfIdle(el: HTMLElement): void {
+  const active = document.activeElement;
+  if (active === null || active === document.body) {
+    el.focus();
+  }
+}
