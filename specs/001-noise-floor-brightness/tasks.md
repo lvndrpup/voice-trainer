@@ -15,6 +15,14 @@ SC-004 ("unchanged, demonstrably") cannot be satisfied by inspection.
 
 **Source issue**: [#64](https://github.com/lvndrpup/voice-trainer/issues/64)
 
+> [!IMPORTANT]
+> **Retrospective worked example — do not run `/speckit-implement` on
+> this.** Issue #64 is already implemented in
+> [PR #73](https://github.com/lvndrpup/voice-trainer/pull/73). Every
+> checkbox below is intentionally left unchecked: they describe what the
+> task breakdown *would* have been, not outstanding work. See
+> [spec.md](./spec.md) for the full framing.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: parallelizable — different file, no dependency on incomplete work

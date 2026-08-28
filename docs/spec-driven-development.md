@@ -106,8 +106,21 @@ extension this project does not install. Branch naming stays
 is a real run of steps 1, 3 and 4 against issue
 [#64](https://github.com/lvndrpup/voice-trainer/issues/64). Read it to
 see what the artifacts actually look like before running your own.
-Its implementation is deliberately *not* in that change — the spec
-tree was the deliverable.
+
+It is **retrospective**: #64 was already implemented in
+[PR #73](https://github.com/lvndrpup/voice-trainer/pull/73) before the
+spec was written. That tree is a demonstration of the loop, not
+outstanding work, and its tasks are deliberately left unchecked. Where
+its `research.md` reaches a different conclusion than #73 did, that is
+a documented difference of judgment on an explicit trade-off — read it
+as an example of how the artifacts record reasoning, not as guidance
+for the noise-floor work.
+
+The useful thing to study in it is `plan.md`'s **Constitution Check**:
+it shows the gate doing real work rather than rubber-stamping —
+principle III needed an explicit argument that a display constant is
+not a hardcoded frequency target, and principle VII forced a
+documentation task into the task list.
 
 ## The constitution
 

@@ -89,6 +89,40 @@ visible but collapses 4.4-5.5 dB, and at level 18 would render the
 noise floor at the same brightness the existing docs record for -95 dB
 signal, which straightforwardly violates FR-006.
 
+## Relationship to PR #73
+
+[PR #73](https://github.com/lvndrpup/voice-trainer/pull/73) implements
+issue #64 already, and chose `MIN_DRAWN_LEVEL = 24`. This research was
+done independently as a Spec Kit demonstration and landed on 8. **The
+difference is a trade-off, not a defect**, and nothing here asks for #73
+to change.
+
+Applying the same L\* method to both:
+
+| floor | L\* | dB collapsed | % of the 70 dB range |
+|---|---|---|---|
+| 8 (this document) | 2.19 | 2.20 | 3.1% |
+| 24 (PR #73) | 8.25 | 6.59 | 9.4% |
+
+The two sit at opposite ends of the same FR-001 / FR-006 tension. PR #73
+chose confident visibility and accepted a wider collapsed band, stating
+that trade-off explicitly in its summary. This document chose to preserve
+dynamic range and accepted that L\* 2.19 might not be perceptible.
+
+**Neither value is verified on a real display**, which is the actual
+open question and the reason the two analyses can disagree without
+either being wrong. PR #73's own test plan leaves the manual visual
+check unchecked for the same reason this one does. Whichever value
+ships, the constant should stay named and single-sourced so it can be
+revised after a real perceptual check.
+
+One thing worth noting for anyone reading both: under either value the
+clamp is an upward `Math.max`, so there is no perceptual inversion —
+everything below the floor collapses *up* to it. An earlier reading of
+these numbers as showing that #73 renders the noise floor brighter than
+genuine -95 dB signal is wrong; -95 dB (level 18) is itself clamped to
+24 under #73, so the two are equal, not inverted.
+
 ## Decision 3: Verification approach
 
 **Decision**: Two layers, one automated and one manual, with the split

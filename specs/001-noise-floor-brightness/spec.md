@@ -17,6 +17,24 @@ visibly distinguishable from a blank/uninitialized canvas."
 > acceptance criteria, non-goals, and edge cases are authoritative and are
 > carried through below.
 
+> [!IMPORTANT]
+> **Retrospective. This is a worked example, not a live proposal.**
+>
+> Issue #64 is already implemented in
+> [PR #73](https://github.com/lvndrpup/voice-trainer/pull/73), which was
+> open and reviewed before this spec was written. This tree exists to
+> demonstrate the Spec Kit loop against a real, well-specified issue —
+> see [docs/spec-driven-development.md](../../docs/spec-driven-development.md).
+>
+> It is **not** a request to change PR #73. Where this spec's
+> [research.md](./research.md) lands on a different floor value than #73
+> chose, that is a documented difference of judgment on an explicit
+> trade-off, with neither value verified on a real display. See
+> research.md's "Relationship to PR #73".
+>
+> Read this tree for the *shape* of the artifacts and how the constitution
+> gate behaves, not as guidance for the noise-floor work itself.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Confirming the instrument is live (Priority: P1)

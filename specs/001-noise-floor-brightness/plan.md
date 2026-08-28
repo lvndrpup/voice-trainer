@@ -4,6 +4,14 @@
 
 **Input**: Feature specification from `specs/001-noise-floor-brightness/spec.md`
 
+> [!IMPORTANT]
+> **Retrospective worked example.** Issue #64 is already implemented in
+> [PR #73](https://github.com/lvndrpup/voice-trainer/pull/73). Do not
+> execute this plan — read it for the shape of the artifacts and for how
+> the Constitution Check behaves against a real change. See
+> [spec.md](./spec.md) and [research.md](./research.md)'s "Relationship
+> to PR #73".
+
 ## Summary
 
 Give any pixel produced by an actual drawn column a minimum brightness
