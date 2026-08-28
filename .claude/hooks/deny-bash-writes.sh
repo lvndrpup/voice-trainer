@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Bash matcher). Scoped via subagent frontmatter, not
 # global settings.json — only fires while a read-only-tagged subagent
-# (groomer, reviewer, docs-auditor, dsp-numerics-auditor) is running.
+# (reviewer, docs-auditor, dsp-numerics-auditor) is running.
 # See docs/decisions.md for the full threat model and why debugger and
 # accessibility-tester are handled differently.
 #

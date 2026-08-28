@@ -2,8 +2,8 @@
 name: docs-auditor
 description: Sweeps the whole docs/ tree for Diátaxis mode-mixing, ADR-immutability violations, dead relative links, and stale Mermaid diagrams.
 tools: Read, Grep, Glob, Bash
-# This hooks: block is copy-pasted identically into four agent files
-# (groomer/reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
+# This hooks: block is copy-pasted identically into three agent files
+# (reviewer/docs-auditor/dsp-numerics-auditor) — Claude Code's
 # subagent frontmatter has no include/anchor mechanism to de-duplicate
 # it. If you touch this block (the script path, the matcher, adding a
 # second one), touch all four — nothing enforces that they stay in
