@@ -360,6 +360,30 @@ for now," not "settled forever."
   confirm the hook actually fires in practice. Until then, treat this
   as implemented-but-unverified, not confirmed-working.
 
+- `/wizard-review` now defaults to a single correctness wizard, with
+  the four-persona fan-out, the cross-wizard reaction round, and the
+  Scrum Master synthesis all behind an explicit `deep` opt-in.
+  Rationale: the cost of this skill was never the persona definitions —
+  all five `wizard-*` agents together are ~2,000 words — it is the
+  fan-out, five or six separate agent runs that each start cold and
+  re-read the diff and CLAUDE.md. A routine PR does not need four
+  lenses plus a reaction round. Naming specific wizards explicitly
+  still wins over the default, so the deep pass stays one word away.
+  Two consequences were handled rather than left to rot: the reaction
+  round is skipped whenever fewer than two wizards ran (a reaction
+  round with one participant has nothing to react to), and
+  `/wizard-act` no longer treats a missing Scrum Master comment as
+  proof the PR was never reviewed — under a light-mode default that
+  inference is simply wrong.
+- **This deliberately reversed a previous rule.** CLAUDE.md had stated
+  the Scrum Master "always runs last regardless of which reviewers
+  ran." That was right when every run was a four-persona fan-out and
+  synthesis was the only thing making the output readable; it does not
+  survive a one-wizard default, where synthesis re-reads what a single
+  agent just said and says it again at the cost of another cold agent
+  run. Recorded here rather than silently edited, since the old rule
+  was load-bearing for `/wizard-act`'s input assumptions.
+
 ## Corrected
 
 - Golden-file test harness was originally scheduled first, then

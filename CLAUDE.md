@@ -69,16 +69,21 @@ docs/documentation-standards.md. Summary:
   PreToolUse hook (.claude/hooks/check-test-plan.sh) while the PR's
   Test plan section still has unchecked boxes. Only constrains Claude
   Code sessions — merging manually on GitHub is unaffected.
-- `/wizard-review [PR#]` runs reviewer personas — correctness,
-  security, simplicity, performance (.claude/agents/wizard-*.md) —
-  independently, then a cross-wizard reaction round, then a Scrum
-  Master (.claude/agents/wizard-scrummaster.md) synthesis comment that
-  always runs last regardless of which reviewers ran, and posts these
-  as comments on the PR. Not automatic; run it when you want it. When
-  executing the /wizard-review command, clarify which wizard reviewers
-  to include, which **[effort_level]** they should be using, and
-  whether to post the full discussion or just the Scrum Master's
-  summary. Markdown must look as good as possible for the human readers.
+- `/wizard-review [PR#]` posts review findings as comments on the PR.
+  Not automatic; run it when you want it. **Default is light: one
+  reviewer (correctness), no reaction round, no Scrum Master.** The
+  expensive part was never the persona definitions — it's the fan-out,
+  five or six separate agent runs each starting cold on the same diff.
+  `/wizard-review [PR#] deep` opts into the full pass: all four
+  personas (.claude/agents/wizard-*.md) independently, then a
+  cross-wizard reaction round, then a Scrum Master
+  (.claude/agents/wizard-scrummaster.md) synthesis comment last.
+  Naming specific wizards explicitly always wins over the default.
+  The reaction round is skipped whenever fewer than two wizards ran,
+  and the Scrum Master runs in deep mode only — synthesizing a single
+  wizard is pure overhead. Confirm the **[effort_level]**, and in deep
+  mode whether to post the full discussion or just the summary.
+  Markdown must look as good as possible for the human readers.
 - `/wizard-act [PR#]` follows up a `/wizard-review` pass: reads the
   Scrum Master's bottom line plus every wizard/human comment, checks
   which findings still hold against current code, then enters plan
