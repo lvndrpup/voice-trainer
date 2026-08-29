@@ -77,6 +77,7 @@ can't be part of the PR it's documenting. After a PR merges:
 | v0.3 | #63 | #72 | `c8218e7` | Keyboard focus restored to start/delete/export buttons after re-enable (`focusIfIdle()` guard); also fixed an adjacent button re-enable race against capture state |
 | v0.3 | #65 | #74 | `be3c6b4` | Investigated spectrogram's linear dB→digital-value mapping via sRGB EOTF + CIE L* conversion; found it already near-perceptually-uniform, no mapping change adopted, resolving the prior `[likely]` accessibility flag |
 | v0.3 | #46 | #69 | `9f11f3f` | Investigated high-F0 `estimateFormants` accuracy mitigations (higher LPC order, pitch-synchronous windowing); neither adopted, `estimateFormants` unchanged, follow-ups filed as #67 and #68 |
+| v0.3 | #64 | #73 | `5d895af` | Below-noise-floor spectrogram pixels given a `MIN_DRAWN_LEVEL` (24/255) brightness floor, so a drawn column is distinguishable from cleared canvas; manual visual check not performed before merge |
 
 ## Infra & Tooling
 
@@ -99,6 +100,7 @@ applies.
 | #42 | `d1d2307` | `debugger` subagent added — reproduces and root-causes a live failure, report-only, never applies a fix |
 | #39 | `914d853` | `accessibility-tester` subagent added — audits canvas UI for keyboard access, screen-reader labeling, colorblind-safe contrast |
 | #40 | `5ea184e` | `dsp-numerics-auditor` subagent added — validates DSP estimators against synthetic/analytic ground truth |
+| #80 | `9225977` | GitHub Spec Kit v1.0.1 adopted as the spec-driven development driver — `.specify/` + 10 `speckit-*` skills, standalone project constitution, `groomer` retired, ADR 0005 + `docs/spec-driven-development.md`, retrospective worked example under `specs/001-noise-floor-brightness/` |
 
 ## History (pre-dates this file)
 
