@@ -19,6 +19,12 @@ tools lack.
   (Adherence streaks allowed, post-session report only, must survive
   off-day flags.)
 
+These are restated in plan-checkable form in the project constitution
+(`.specify/memory/constitution.md`), which is the gate `/speckit-plan`
+checks every plan against. This file stays the authority for session
+and process rules; the constitution is the authority for what a plan
+or spec may contain. See "Spec-driven development" below.
+
 ## Architecture
 Vite + TypeScript. No UI framework. Canvas 2D.
 - `src/audio/`  — Web Audio API. The ONLY place that touches it.
@@ -55,6 +61,41 @@ docs/documentation-standards.md. Summary:
   about itself). Read them for direction and context; before treating
   anything in them as true of the app as it exists right now, verify
   against code, a reference doc, or ledger.md.
+
+## Spec-driven development
+GitHub Spec Kit (pinned v1.0.1) drives any change that adds or alters
+product capability. See docs/spec-driven-development.md for the full
+loop and docs/adr/0005-spec-driven-development-with-spec-kit.md for
+why. Short version:
+
+- The loop is `/speckit-specify` -> `/speckit-plan` -> `/speckit-tasks`
+  -> `/speckit-implement`, working from an existing board issue.
+  Artifacts land in `specs/<NNN-slug>/`.
+- `/speckit-specify` **consumes** the linked issue's acceptance
+  criteria, non-goals, and edge cases — it does not re-derive them.
+  The issue stays the board's unit of work; the spec is its expansion.
+- `specs/` holds pre-merge working artifacts for one feature. `docs/`
+  holds durable reference. ledger.md and the reference docs remain
+  ground truth for what shipped; a spec is intent, like roadmap.md.
+- Skip the loop for: one-off edits already carved out under Tracking
+  below (typo/copy fixes, a config value, a version bump), and pure
+  investigation spikes where the outcome is unknown — there is no
+  spec to write until you know the answer. Write the spec after the
+  spike if it turns into real work.
+
+Two commands are fenced off, deliberately:
+- **Never run `/speckit-taskstoissues`.** It mass-creates issues from
+  a task list, straight through the WIP-limit-1 and Ready-cap-5 rules.
+  Tasks live in `tasks.md`; the board tracks issues, not tasks.
+- **`/speckit-analyze` is not code review.** Its own definition
+  declares it STRICTLY READ-ONLY over spec.md/plan.md/tasks.md; it
+  never opens a source file. Spec Kit ships no code review at all —
+  that is `/wizard-review` and the `reviewer` agent, which is why they
+  were kept when `groomer` was retired.
+
+The speckit skills ship `disable-model-invocation: false`, so they can
+be fired autonomously. Don't. They are user-invoked only — each one
+writes files and costs real tokens.
 
 ## Git
 - Conventional Commits for commit messages and PR titles.

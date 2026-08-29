@@ -360,6 +360,40 @@ for now," not "settled forever."
   confirm the hook actually fires in practice. Until then, treat this
   as implemented-but-unverified, not confirmed-working.
 
+- Spec-driven development is now the default driver for any change
+  that adds or alters product capability, via [GitHub Spec
+  Kit](https://github.com/github/spec-kit) v1.0.1, pinned. The loop is
+  `/speckit-specify` -> `/speckit-plan` -> `/speckit-tasks` ->
+  `/speckit-implement`, with per-feature artifacts under `specs/`. What
+  it actually buys: the plan and task-decomposition phase, which this
+  project had no tooling for at all. What it does not buy, contrary to
+  the usual pitch: it is **not** cheaper. Its ten skills total 18,477
+  words against 4,701 for all fourteen agent/skill definitions this repo
+  already had; `/speckit-checklist` alone (2,993) exceeds the five
+  `wizard-*` personas combined (2,000). Adopted for rigor, with the cost
+  understood and accepted. See
+  [spec-driven-development.md](./spec-driven-development.md) and
+  [ADR 0005](./adr/0005-spec-driven-development-with-spec-kit.md).
+- Two Spec Kit commands are deliberately fenced off.
+  `/speckit-taskstoissues` mass-creates GitHub issues from a task list,
+  which drives straight through the board's WIP-limit-1 and Ready-cap-5
+  rules — the flow control is the point, so the command stays unused.
+  `/speckit-analyze` is permitted but must never be mistaken for code
+  review: its own skill definition declares it `STRICTLY READ-ONLY`
+  over `spec.md`/`plan.md`/`tasks.md`, and it never opens a source
+  file. It checks the plan against itself, not the code against the
+  plan. Spec Kit ships no code-review capability whatsoever, which is
+  why the `wizard-*` bench and `reviewer` were kept.
+- The project constitution (`.specify/memory/constitution.md`) is
+  written as a full standalone document rather than a pointer stub back
+  to CLAUDE.md. Rationale: it is the gate `/speckit-plan` checks every
+  plan against, so anything absent from it is simply not gated — a
+  minimal version would let layer-boundary and new-dependency
+  violations pass unchecked. The drift risk this creates is managed by
+  an explicit ownership rule in its Governance section: the
+  constitution owns rules checkable against a plan or spec, CLAUDE.md
+  owns session, git, and board process. A conflict between them is a
+  bug to fix in one of them, not something to reinterpret at plan time.
 - `/wizard-review` now defaults to a single correctness wizard, with
   the four-persona fan-out, the cross-wizard reaction round, and the
   Scrum Master synthesis all behind an explicit `deep` opt-in.
@@ -454,6 +488,24 @@ for now," not "settled forever."
   widely used in the trans community, and there is no visible epidemic
   of harm. Caution was directionally right and quantitatively
   overtuned.
+
+- The `groomer` subagent is retired, deleted in the same change that
+  adopted Spec Kit. `/speckit-specify` produces the same artifact —
+  acceptance criteria, scope, non-goals — with more structure, so
+  keeping both meant two tools competing to write one document. This
+  was the only genuine overlap Spec Kit introduced; every other agent
+  (`reviewer`, the `wizard-*` personas, `docs-auditor`,
+  `accessibility-tester`, `dsp-numerics-auditor`, `debugger`,
+  `ledger-scribe`) does something Spec Kit cannot do at all and was
+  kept. The board-field hygiene `groomer` also handled — Size, Layer,
+  milestone — did not vanish with it; it moved into the documented
+  issue-to-`/speckit-specify` handoff step in
+  [spec-driven-development.md](./spec-driven-development.md).
+  Note that the read-only-subagent hook entry under "Decided — process"
+  above still names `groomer` as one of the four agents wired to
+  `deny-bash-writes.sh`; that was accurate when written and is left
+  as-is per this file's own no-rewriting-history habit. Three agents
+  carry that hook now.
 
 ## Open
 

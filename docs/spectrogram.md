@@ -77,6 +77,16 @@ defaults). No colormap dependency, kept intentionally simple for a
 first-pass instrument display — revisit if a warmer/perceptual
 colormap turns out to matter once there's something to look at.
 
+Any pixel `pushColumn()` actually draws gets a `MIN_DRAWN_LEVEL` (24 of
+255) brightness floor, even at or below `minDb` — without it, that
+clamped-to-0 intensity and `clear()`'s solid-black fill were the same
+`rgb(0,0,0)`, so "quiet signal, correctly captured" and "nothing drawn
+here yet" were visually indistinguishable (issue #64). See the
+`MIN_DRAWN_LEVEL` comment in `src/render/index.ts` for the full
+rationale and accepted tradeoff — kept there rather than duplicated
+here, since it's the version more likely to stay current as the code
+changes.
+
 **Investigated for issue #65**: an earlier accessibility audit flagged
 `[likely]` that this linear dB→digital-value mapping might be
 perceptually *compressed* at the quiet end — equal digital-value steps
@@ -175,14 +185,17 @@ it previously had no accessible name or fallback content at all.
 The same audit pass found three further gaps left open, filed
 separately rather than folded into this fix (out of scope for issue
 #38, which was scoped to the readouts and the canvas label):
-action (issue #63 — **fixed**, see below); below-noise-floor signal
-rendering identically to the blank canvas background (`level = 0` for
-both, issue #64, still open); and a suspicion that the grayscale
-mapping's earlier colorblind sign-off (hue-independence only) might
-also hide a perceptual-linearity gap at the quiet end (issue #65 —
-**investigated, not adopted**: see "Magnitude-to-brightness mapping"
-above — the mapping turned out to already be close to perceptually
-uniform, not compressed).
+keyboard focus being dropped to `<body>` on every start/delete/export
+action because the just-activated button gets disabled without a
+restore-focus call (issue #63 — **fixed**, see below); below-noise-floor
+signal rendering identically to the blank canvas background (issue
+#64 — **fixed**, see "Magnitude-to-brightness mapping" above); and the
+grayscale mapping's earlier colorblind sign-off checking
+hue-independence but not perceptual linearity, so quiet-end contrast
+may be compressed relative to sRGB's actual response curve (issue
+#65 — **investigated, not adopted**: see "Magnitude-to-brightness
+mapping" above — the mapping turned out to already be close to
+perceptually uniform, not compressed).
 
 **Issue #63 fix**: `handleStart()`, `handleDeleteAll()`, and
 `handleExport()` (`src/main.ts`) each disable the button that was just

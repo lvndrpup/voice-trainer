@@ -23,11 +23,13 @@ for what's actually scheduled.
 
 Candidate `.claude/agents/*.md` beyond the existing wizard-review
 persona set (correctness/security/simplicity/performance, reviews
-PRs) and the shipped `groomer`, `reviewer`, `ledger-scribe`,
-`docs-auditor`, `accessibility-tester`, `dsp-numerics-auditor`, and
-`debugger` subagents. Parked here rather than filed as issues since
-these are dev tooling, not versioned product scope — pick one, and it
-graduates straight to a drafted agent file, no milestone needed.
+PRs) and the shipped `reviewer`, `ledger-scribe`, `docs-auditor`,
+`accessibility-tester`, `dsp-numerics-auditor`, and `debugger`
+subagents (`groomer` was retired when Spec Kit's `/speckit-specify`
+took over issue grooming). Parked here rather than filed as issues
+since these are dev tooling, not versioned product scope — pick one,
+and it graduates straight to a drafted agent file, no milestone
+needed.
 
 - *(weaker, optional)* **dependency-gatekeeper** — flags new
   `package.json` deps/bundle size against CLAUDE.md's "ask before
