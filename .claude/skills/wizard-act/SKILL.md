@@ -15,11 +15,13 @@ Same rule as `wizard-review`: if an argument looks like a number, that's the PR;
 
 `gh pr view <n> --json title,body,comments` (and `gh pr diff <n>` for the current diff). From the comments, separate three things:
 
-- **The Scrum Master's Bottom Line** — the comment headed `## 🧭 Scrum Master — Summary`. This is the macro directive: mergeable as-is, blocked on something specific, or fine with minor notes.
+- **The Scrum Master's Bottom Line** — the comment headed `## 🧭 Scrum Master — Summary`. This is the macro directive: mergeable as-is, blocked on something specific, or fine with minor notes. Present only if `/wizard-review` ran in deep mode; light-mode runs post no Scrum Master comment.
 - **Wizard findings** — comments headed `## 🧙 <Persona> — <lens>`, each with CONFIRMED/PLAUSIBLE findings and file:line claims.
 - **Human comments** — anything else, including the PR author's own replies. Weight these at least as high as wizard findings — a human saying "actually that's intentional" overrides a wizard's guess.
 
-If there's no Scrum Master comment on the PR, tell the user this PR hasn't been through `/wizard-review` (or the comment predates it) and ask whether to proceed on human comments alone or stop.
+If there's no Scrum Master comment **but there is at least one wizard comment**, `/wizard-review` ran in light mode (its default: one wizard, no synthesis). This is normal, not a problem — proceed on the wizard findings directly. There's no bottom line to quote in step 5; say so rather than inventing one, and mention that `/wizard-review <n> deep` would add the other three lenses if the user wants them before acting.
+
+If there's neither a Scrum Master comment nor any wizard comment, tell the user this PR hasn't been through `/wizard-review` (or the comments predate it) and ask whether to proceed on human comments alone or stop.
 
 If a Scrum Master comment exists but there are zero wizard comments, `wizard-review` ran in "summary only" posting mode — there's no file:line detail to reconcile, only the SM's tally and 1-2 sentence bottom line. Don't invent findings from that prose, and don't silently do nothing either: tell the user this is the case and ask (`AskUserQuestion`) whether to proceed treating the SM's bottom line as the sole input, or stop so they can re-run `/wizard-review` in full-discussion mode first.
 
@@ -39,7 +41,7 @@ Sort findings into two buckets:
 
 Call `EnterPlanMode`. Once in plan mode, write a plan file covering:
 
-- One line: the Scrum Master's bottom line, verbatim or near-verbatim.
+- One line: the Scrum Master's bottom line, verbatim or near-verbatim. If the review ran in light mode there is no Scrum Master comment — write one line summarizing the wizard's own findings instead, and say that's what it is.
 - The actionable findings, grouped by file, each as a concrete change (not "improve X" — say what the diff will actually do).
 - The flagged-not-actioned list, with why each was left out.
 - Which of `npm run lint` / `npm run typecheck` / `npm test` apply to the files being touched, so the user knows what will run after approval.

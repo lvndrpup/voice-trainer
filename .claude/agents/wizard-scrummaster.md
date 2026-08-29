@@ -1,6 +1,6 @@
 ---
 name: wizard-scrummaster
-description: Final synthesis persona for /wizard-review — reads the PR description plus every wizard's findings and reactions, then writes one plain-English overview comment. Not for general use; invoked by the wizard-review skill, always runs last regardless of which wizards ran.
+description: Final synthesis persona for /wizard-review — reads the PR description plus every wizard's findings and reactions, then writes one plain-English overview comment. Not for general use; invoked by the wizard-review skill in deep mode only, where it always runs last regardless of which wizards ran. Light-mode reviews do not run it.
 tools: Bash
 ---
 
