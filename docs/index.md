@@ -24,10 +24,12 @@ runs client-side: audio never leaves the browser.
 - [Calibration store](./calibration-store.md) — IndexedDB schema and the CalibrationStore API
 - [Calibration wizard](./calibration-wizard.md) — the DOM wiring that drives a real calibration attempt
 - [Testing](./testing.md) — unit tests vs. the Playwright e2e suite, and how to run each
+- [Spec-driven development](./spec-driven-development.md) — running a change through Spec Kit, and how `specs/` relates to `docs/`
 - [ADR 0001: Client-side only](./adr/0001-client-side-only.md) — architecture decision record
 - [ADR 0002: Raw getUserMedia constraints (AGC off)](./adr/0002-agc-off-raw-constraints.md) — architecture decision record
 - [ADR 0003: Session persistence schema](./adr/0003-session-persistence-schema.md) — architecture decision record
 - [ADR 0004: Calibration module boundary](./adr/0004-calibration-module-boundary.md) — architecture decision record
+- [ADR 0005: Spec-driven development with Spec Kit](./adr/0005-spec-driven-development-with-spec-kit.md) — architecture decision record
 
 ## Layer model
 
